@@ -386,7 +386,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -453,6 +453,13 @@ async function translate(lang) {
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
+    // Update language selection state in dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isSelected = option.getAttribute('data-lang') === effectiveLang;
+        option.classList.toggle('is-active', isSelected);
+        option.setAttribute('aria-selected', isSelected.toString());
+    });
+
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
@@ -493,23 +500,35 @@ function setupLanguageSelector() {
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        const isExpanded = languageDropdown.style.display !== 'none';
+        languageDropdown.style.display = isExpanded ? 'none' : 'block';
+        languageToggle.setAttribute('aria-expanded', (!isExpanded).toString());
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
         }
     });
     
     // Handle language selection
     document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
+        const select = function() {
+            const selectedLang = option.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
             languageToggle.focus();
+        };
+
+        option.addEventListener('click', select);
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                select();
+            }
         });
     });
 }
