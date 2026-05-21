@@ -13,8 +13,23 @@ const LANGUAGE_NAMES = {
     'es': 'Español'
 };
 
-// Helper for element selection
-const el = (id) => document.getElementById(id);
+// DOM Element Cache to minimize redundant lookups
+const domCache = new Map();
+
+/**
+ * Helper for element selection with O(1) caching
+ * @param {string} id - The ID of the element to retrieve
+ * @returns {HTMLElement|null}
+ */
+const el = (id) => {
+    if (!id) return null;
+    let element = domCache.get(id);
+    if (!element || !element.isConnected) {
+        element = document.getElementById(id);
+        if (element) domCache.set(id, element);
+    }
+    return element;
+};
 
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
@@ -1949,6 +1964,7 @@ function setupSupportButtons() {
         // Remove any existing listeners by cloning the button
         const newButton = sendToSupportButton.cloneNode(true);
         sendToSupportButton.parentNode.replaceChild(newButton, sendToSupportButton);
+        domCache.delete('sendToSupportButton');
         
         newButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -1963,6 +1979,7 @@ function setupSupportButtons() {
         // Remove any existing listeners by cloning the button
         const newButton = copyToClipboardButton.cloneNode(true);
         copyToClipboardButton.parentNode.replaceChild(newButton, copyToClipboardButton);
+        domCache.delete('copyToClipboardButton');
         
         newButton.addEventListener('click', function(e) {
             e.preventDefault();
