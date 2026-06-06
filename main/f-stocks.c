@@ -284,8 +284,6 @@ void parse_stock_entities(const char *input)
     p = input;
     while ((p = strstr(p, "[$:")) != NULL)
     {
-        const char *token_start = p; // Save start of token
-
         // Find the end of the token
         const char *end = strchr(p, ']');
         if (end == NULL)

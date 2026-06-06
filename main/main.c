@@ -46,7 +46,7 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.30";
+const char version[10] = "2.30BPO";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 66;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
@@ -682,7 +682,7 @@ void startup_read_eeprom(void)
     nvs_close(nvs_handle);
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HTTPD_MAX_REQ_HDR_LEN=%u",
-                (unsigned)HTTPD_MAX_REQ_HDR_LEN);
+                (unsigned)CONFIG_HTTPD_MAX_REQ_HDR_LEN);
 
     // 5. Log final parameters
     ESP_LOG_WEB(ESP_LOG_INFO, TAG,

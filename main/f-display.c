@@ -264,7 +264,7 @@ esp_err_t startup_lcd(void)
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LCD driver install");
   const esp_lcd_panel_dev_config_t panel_config = {
       .reset_gpio_num = LCD_GPIO_RST,
-      .color_space = LCD_COLOR_SPACE,
+      .rgb_ele_order = LCD_COLOR_SPACE,
       .bits_per_pixel = LCD_BITS_PER_PIXEL,
   };
 
@@ -793,6 +793,15 @@ void display_changed(void)
   show_object(img_moon, eeprom_quiet_weather && time_valid);                           // show moon icon if we have valid time
   show_object(label_msg, eeprom_quiet_scroll || !time_valid);                          // show scrolling information message if quiet scroll is enabled or time is not valid
 
+  // Show clock digits and dots if time is valid
+  if (time_valid)
+  {
+    for (int i = 0; i < 4; i++)
+      show_object(digit_objs[i], true);
+    show_object(dots[0], true);
+    show_object(dots[1], true);
+  }
+
   // Show/hide glucose icon, WiFi icon, and trend arrow
   if (wifi_disabled_by_active_hours)
   {
@@ -834,8 +843,15 @@ void display_digit(int position, int digit)
   if (digit < -1 || digit > 9)
     return;
 
-  lv_image_set_offset_x(digit_objs[position], -digit * DIGIT_WIDTH);
-  // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displayed digit %d at position %d (x=%d)", digit, position, digit * DIGIT_WIDTH);
+  if (digit == -1)
+  {
+    show_object(digit_objs[position], false);
+  }
+  else
+  {
+    show_object(digit_objs[position], true);
+    lv_image_set_offset_x(digit_objs[position], -digit * DIGIT_WIDTH);
+  }
 }
 
 float ease_in_quad(float t)
