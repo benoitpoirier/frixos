@@ -25,6 +25,8 @@
                     data-i18n="menu.settings">Settings</a>
                 <a href="#advanced" class="menu-item" data-section="advanced-section"
                     data-i18n="menu.advanced">Advanced</a>
+                <a href="#screen" class="menu-item" data-section="screen-section"
+                    data-i18n="menu.screen">Layout</a>
                 <a href="#integrations" class="menu-item" data-section="integrations-section"
                     data-i18n="menu.integrations">Integrations</a>
                 <a href="#status" class="menu-item" data-section="status-section" data-i18n="menu.status">Status</a>
@@ -141,16 +143,6 @@
                     </div>
                     <div class="section-content">
                         <div class="form-group">
-                            <label for="ofs_x" data-i18n="advanced.display.x_offset">X Offset</label>
-                            <input type="number" id="ofs_x" name="ofs_x" min="0" max="160">
-                            <span id="ofs_x-error" class="input-error"></span>
-                        </div>
-                        <div class="form-group">
-                            <label for="ofs_y" data-i18n="advanced.display.y_offset">Y Offset</label>
-                            <input type="number" id="ofs_y" name="ofs_y" min="0" max="160">
-                            <span id="ofs_y-error" class="input-error"></span>
-                        </div>
-                        <div class="form-group">
                             <label for="rotation" data-i18n="advanced.display.rotation">Display Rotation</label>
                             <select id="rotation" name="rotation">
                                 <option value="0">0°</option>
@@ -159,90 +151,6 @@
                                 <option value="3">270°</option>
                             </select>
                         </div>
-                        <h3 data-i18n="advanced.day.title">Day Settings</h3>
-                        <div class="form-group">
-                            <label for="dayfont" data-i18n="advanced.day.font">Font</label>
-                            <select id="dayfont" name="dayfont">
-                                <option value="bold">Bold</option>
-                                <option value="light">Light</option>
-                                <option value="lcd">LCD</option>
-                                <option value="nixie">Nixie</option>
-                                <option value="robrito">Robrito</option>
-                                <option value="ficasso">Ficasso</option>
-                                <option value="lichten">Lichten</option>
-                                <option value="kablame">Kablame</option>
-                                <option value="kablamo">Kablamo</option>
-                                <option value="kaboom">Kaboom</option>
-                                <option value="user1">User1</option>
-                                <option value="user2">User2</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="color_filter" data-i18n="advanced.day.color_filter">Color Filter</label>
-                            <select id="color_filter" name="color_filter">
-                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
-                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
-                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
-                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
-                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="msg_color" data-i18n="advanced.day.message_color">Message Color</label>
-                            <input type="color" id="msg_color" name="msg_color" value="#FFFFFF">
-                        </div>
-
-                        <h3 data-i18n="advanced.night.title">Night Settings</h3>
-                        <div class="form-group">
-                            <label for="nightfont" data-i18n="advanced.night.font">Font</label>
-                            <select id="nightfont" name="nightfont">
-                                <option value="bold">Bold</option>
-                                <option value="light">Light</option>
-                                <option value="lcd">LCD</option>
-                                <option value="nixie">Nixie</option>
-                                <option value="robrito">Robrito</option>
-                                <option value="ficasso">Ficasso</option>
-                                <option value="lichten">Lichten</option>
-                                <option value="kablame">Kablame</option>
-                                <option value="kablamo">Kablamo</option>
-                                <option value="kaboom">Kaboom</option>
-                                <option value="user1">User1</option>
-                                <option value="user2">User2</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="night_color_filter" data-i18n="advanced.night.color_filter">Color Filter</label>
-                            <select id="night_color_filter" name="night_color_filter">
-                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
-                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
-                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
-                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
-                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="night_msg_color" data-i18n="advanced.night.message_color">Message Color</label>
-                            <input type="color" id="night_msg_color" name="night_msg_color" value="#FFFFFF">
-                        </div>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="quiet_scroll" name="quiet_scroll">
-                            <label for="quiet_scroll" data-i18n="advanced.display.show_scroll">Show scrolling
-                                information message</label>
-                        </div>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="quiet_weather" name="quiet_weather">
-                            <label for="quiet_weather" data-i18n="advanced.display.show_weather">Show weather forecast
-                                icon and moon phase</label>
-                        </div>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="show_leading_zero" name="show_leading_zero">
-                            <label for="show_leading_zero" data-i18n="advanced.display.show_leading_zero">Show 0 for
-                                single digit hour</label>
-                        </div>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="dots_breathe" name="dots_breathe">
-                            <label for="dots_breathe" data-i18n="advanced.display.disable_dots_breathe">Disable breathing time dots</label>
-                        </div>
                         <div class="checkbox-container">
                             <input type="checkbox" id="show_grid" name="show_grid">
                             <label for="show_grid" data-i18n="advanced.display.show_grid">Show grid</label>
@@ -250,58 +158,6 @@
                         <div class="checkbox-container">
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-header">
-                        <h2 data-i18n="advanced.fonts.title">Font Samples</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="font-samples-container">
-                            <div class="font-samples-grid">
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Bold</div>
-                                    <img src="bold.jpg" alt="Bold Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Light</div>
-                                    <img src="light.jpg" alt="Light Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">LCD</div>
-                                    <img src="lcd.jpg" alt="LCD Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Nixie</div>
-                                    <img src="nixie.jpg" alt="Nixie Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Robrito</div>
-                                    <img src="robrito.jpg" alt="Robrito Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Ficasso</div>
-                                    <img src="ficasso.jpg" alt="Ficasso Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Lichten</div>
-                                    <img src="lichten.jpg" alt="Lichten Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Kablame</div>
-                                    <img src="kablame.jpg" alt="Kablame Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Kablamo</div>
-                                    <img src="kablamo.jpg" alt="Kablamo Font Sample" class="font-sample-img">
-                                </div>
-                                <div class="font-sample-box">
-                                    <div class="font-sample-name">Kaboom</div>
-                                    <img src="kaboom.jpg" alt="Kaboom Font Sample" class="font-sample-img">
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -357,27 +213,45 @@
                         <h2 data-i18n="advanced.brightness.title">Projection brightness settings</h2>
                     </div>
                     <div class="section-content">
-                        <h3 data-i18n="advanced.brightness.auto_dimming">Automatic dimming settings</h3>
+                        <h3 data-i18n="advanced.brightness.dimming_selection">Dimming selection</h3>
                         <div class="form-group">
-                            <label for="lux_threshold" data-i18n="advanced.brightness.day_threshold">Day Threshold
-                                (lux)</label>
-                            <input type="number" id="lux_threshold" name="lux_threshold" step="0.1" min="0" max="500">
-                            <span id="lux_threshold-error" class="input-error"></span>
+                            <label for="dim_mode" data-i18n="advanced.brightness.dimming_mode">Dimming mode</label>
+                            <select id="dim_mode" name="dim_mode">
+                                <option value="1" data-i18n="advanced.brightness.dim_mode_full">Always full brightness</option>
+                                <option value="0" data-i18n="advanced.brightness.dim_mode_brightness" selected>Based on brightness</option>
+                                <option value="2" data-i18n="advanced.brightness.dim_mode_time">Based on time-of-day</option>
+                            </select>
                         </div>
-                        <div class="form-group">
-                            <label for="lux_sensitivity" data-i18n="advanced.brightness.light_sensitivity">Light
-                                Sensitivity (lux)</label>
-                            <input type="number" id="lux_sensitivity" name="lux_sensitivity" step="0.1" min="0"
-                                max="50">
-                            <span id="lux_sensitivity-error" class="input-error"></span>
+                        <div id="brightness_dimming_section">
+                            <h3 data-i18n="advanced.brightness.brightness_dimming">Brightness-based dimming</h3>
+                            <div class="form-group">
+                                <label for="lux_threshold" data-i18n="advanced.brightness.day_threshold">Day Threshold
+                                    (lux)</label>
+                                <input type="number" id="lux_threshold" name="lux_threshold" step="0.1" min="0" max="500">
+                                <span id="lux_threshold-error" class="input-error"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="lux_sensitivity" data-i18n="advanced.brightness.light_sensitivity">Sensitivity (lux)</label>
+                                <input type="number" id="lux_sensitivity" name="lux_sensitivity" step="0.1" min="0"
+                                    max="50">
+                                <span id="lux_sensitivity-error" class="input-error"></span>
+                            </div>
+                            <p data-i18n="advanced.brightness.sensitivity_help">Sensitivity helps avoid unwanted brightness
+                                changes. Dark = Threshold - Sensitivity, Bright =
+                                Threshold + Sensitivity.</p>
                         </div>
-                        <p data-i18n="advanced.brightness.sensitivity_help">Sensitivity helps avoid unwanted brightness
-                            changes. Dark = Threshold - Sensitivity, Bright =
-                            Threshold + Sensitivity.</p>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="dim_disable" name="dim_disable">
-                            <label for="dim_disable" data-i18n="advanced.brightness.full_brightness">Maintain full
-                                brightness (reduces LED lifespan)</label>
+                        <div id="timeofday_dimming_section">
+                            <h3 data-i18n="advanced.brightness.timeofday_dimming">Time-of-day dimming</h3>
+                            <div class="form-group">
+                                <label for="dim_start" data-i18n="advanced.brightness.dim_start">Start</label>
+                                <input type="number" id="dim_start" name="dim_start" min="0" max="23" value="0">
+                                <span id="dim_start-error" class="input-error"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="dim_end" data-i18n="advanced.brightness.dim_end">End</label>
+                                <input type="number" id="dim_end" name="dim_end" min="0" max="23" value="0">
+                                <span id="dim_end-error" class="input-error"></span>
+                            </div>
                         </div>
                         <h3 data-i18n="advanced.brightness.led_levels">LED Brightness Levels (%)</h3>
                         <div class="form-group">
@@ -403,84 +277,6 @@
                             <label for="max_power" data-i18n="advanced.brightness.max_power">Max Power</label>
                             <input type="number" id="max_power" name="max_power" min="1" max="1023" value="1023">
                             <span id="max_power-error" class="input-error"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-header">
-                        <h2 data-i18n="advanced.message.title">Scrolling Message</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="form-group">
-                            <label for="msg_font" data-i18n="advanced.message.font_size">Font Size</label>
-                            <select id="msg_font" name="msg_font">
-                                <option value="0">8pt</option>
-                                <option value="1">10pt</option>
-                                <option value="2">12pt</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="scroll_delay" data-i18n="advanced.message.scroll_delay">Scroll Delay</label>
-                            <input type="number" id="scroll_delay" name="scroll_delay" min="30" max="255" value="65">
-                            <span class="help-text" data-i18n="advanced.message.scroll_delay_help">Animation delay in
-                                milliseconds (30-255)</span>
-                        </div>
-                        <div class="form-group">
-                            <label for="message" data-i18n="advanced.message.message">Message</label>
-                            <textarea id="message" name="message"
-                                data-i18n-placeholder="advanced.message.message_placeholder" maxlength="511"
-                                rows="2"></textarea>
-                            <span id="message-counter" class="message-counter" role="status" aria-live="polite">0 / 511</span>
-                        </div>
-                        <div class="message-tokens">
-                            <h4 data-i18n="advanced.message.tokens_title">Available Tokens:</h4>
-                            <ul>
-                                <li><code class="token-code" tabindex="0" role="button">[device]</code> - <span data-i18n="advanced.message.token_device">Device
-                                        name</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[greeting]</code> - <span
-                                        data-i18n="advanced.message.token_greeting">Time-based greeting (Good
-                                        Morning/Afternoon/Evening/Night)</span>
-                                </li>
-                                <li><code class="token-code" tabindex="0" role="button">[day]</code> - <span data-i18n="advanced.message.token_day">Current day of the
-                                        week</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[date]</code> - <span data-i18n="advanced.message.token_date">Current
-                                        date</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[mon]</code> - <span data-i18n="advanced.message.token_mon">Current
-                                        month</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[temp]</code> - <span data-i18n="advanced.message.token_temp">Current
-                                        temperature</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[hum]</code> - <span data-i18n="advanced.message.token_hum">Current
-                                        humidity</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[high]</code> - <span data-i18n="advanced.message.token_high">Today's high
-                                        temperature</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[low]</code> - <span data-i18n="advanced.message.token_low">Today's low
-                                        temperature</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[rise]</code> - <span data-i18n="advanced.message.token_rise">Sunrise
-                                        time</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[set]</code> - <span data-i18n="advanced.message.token_set">Sunset time</span>
-                                </li>
-                                <li><code class="token-code" tabindex="0" role="button">[wind]</code> - <span data-i18n="advanced.message.token_wind">Wind speed and direction</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[gust]</code> - <span data-i18n="advanced.message.token_gust">Wind gust speed and direction</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[precip]</code> - <span data-i18n="advanced.message.token_precip">Precipitation amount and probability</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[uv]</code> - <span data-i18n="advanced.message.token_uv">UV index</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[pressure]</code> - <span data-i18n="advanced.message.token_pressure">Sea-level pressure with trend</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[3high]</code> - <span data-i18n="advanced.message.token_3high">Highest temperature across 3 days</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[3low]</code> - <span data-i18n="advanced.message.token_3low">Lowest temperature across 3 days</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[HA:entity_id:path]</code> - <span data-i18n="advanced.message.token_ha">Fetch
-                                        settings from Home Assistant (needs enabled
-                                        integration)</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[$:symbol]</code> - <span data-i18n="advanced.message.token_stock">Fetch stock
-                                        price quote (needs enabled
-                                        stock integration with Finnhub.io)</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[CGM:glucose]</code> - <span data-i18n="advanced.message.token_cgm_glucose">Latest glucose reading from your CGM device, formatted, e.g. 157 mg/dl (+3 @ 12:01). (needs active CGM integration)</span></li>
-                                <li><code class="token-code" tabindex="0" role="button">[CGM:reading]</code> - <span data-i18n="advanced.message.token_cgm_reading">Latest glucose reading, plain, e.g. 157</span></li>
-                            </ul>
-                            <p data-i18n="advanced.message.tokens_note">Note: Tokens are case-sensitive and must be
-                                enclosed in square brackets.</p>
-                            <p data-i18n="advanced.message.default_message">Default message: [device].local/ [greeting]
-                                [day], [date] [mon], now [temp] today
-                                [high]-[low], hum. [hum], sun [rise]-[set]</p>
                         </div>
                     </div>
                 </div>
@@ -842,6 +638,57 @@
             </form>
         </div>
 
+        <!-- Screen Section -->
+        <div id="screen-section" class="page-section" style="display: none;">
+            <div class="section">
+                <h2 data-i18n="screen.title">Layout</h2>
+
+                <div class="screen-layout-picker">
+                    <select id="screenLayoutSelect" class="screen-layout-select" aria-label="Layout file">
+                        <option value="" data-i18n="screen.layout_file_placeholder">Select a layout file</option>
+                    </select>
+                    <button id="screenLoadSystemBtn" type="button" class="button" data-i18n="screen.load_system_layout">Load system layout</button>
+                    <button id="screenRestoreDefaultBtn" type="button" class="button" data-i18n="screen.restore_default">Restore Default</button>
+                </div>
+
+                <hr class="screen-section-divider">
+
+                <p class="screen-intro">
+                    <span data-i18n="screen.description">Place elements on the 128x128 display. Elements can overlap.</span>
+                    <span data-i18n="screen.hint"> Drag items from the palette onto the grid.</span>
+                </p>
+
+                <div class="screen-toolbar">
+                    <div class="screen-mode-toggle" role="group" data-i18n-aria-label="screen.day_night_aria">
+                        <button id="screenModeDay" type="button" class="button" data-i18n="screen.day">Day</button>
+                        <button id="screenModeNight" type="button" class="button" data-i18n="screen.night">Night</button>
+                    </div>
+                    <div class="screen-actions">
+                        <button id="screenCopyBtn" type="button" class="button" data-i18n="screen.copy_to_night">Copy layout to Night</button>
+                        <button id="screenSaveToFileBtn" type="button" class="button" data-i18n="screen.save_to_file">Save to File</button>
+                        <button id="screenReadFromFileBtn" type="button" class="button" data-i18n="screen.read_from_file">Read from File</button>
+                        <button id="screenSaveBtn" type="button" class="button" data-i18n="screen.save">Save</button>
+                    </div>
+                    <input type="file" id="screenLayoutFileInput" accept=".layout,application/json" hidden>
+                </div>
+
+                <div class="screen-editor">
+                    <div class="screen-left-column">
+                        <div class="screen-canvas-wrapper">
+                            <div id="screenCanvas" class="screen-canvas" data-i18n-aria-label="screen.editor_aria" role="application"></div>
+                            <div id="screenStatus" class="screen-status" aria-live="polite"></div>
+                        </div>
+                        <div id="screenOptions" class="screen-options"></div>
+                    </div>
+
+                    <div class="screen-palette">
+                        <h3 data-i18n="screen.palette">Palette</h3>
+                        <div id="screenPaletteItems" class="palette-items"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Files Section -->
         <div id="files-section" class="page-section" style="display: none;">
             <div class="section">
@@ -882,6 +729,12 @@
 
         <!-- Update (OTA) Section -->
         <div id="update-section" class="page-section" style="display: none;">
+            <div class="section">
+                <h2 data-i18n="update.refresh_title">Refresh</h2>
+                <p data-i18n="update.refresh_description">This downloads and installs again the current version of the firmware and files (spiffs).</p><br />
+                <button type="button" id="reinstallButton" class="button" data-i18n="update.reinstall_button">Reinstall current firmware</button>
+            </div>
+
             <div class="section">
                 <h2 data-i18n="update.title">Upload Firmware / Files</h2>
                 <p data-i18n="update.auto_check">Your device checks and installs new firmware automatically. </p>

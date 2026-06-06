@@ -861,9 +861,56 @@ void parse_HA_entities(const char *input)
                 integration_active_tokens_count[INTEGRATION_HA]);
 }
 
+void build_integration_message_corpus(char *out, size_t out_size)
+{
+    if (!out || out_size == 0)
+        return;
+
+    out[0] = '\0';
+    size_t used = 0;
+
+    for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
+    {
+        const screen_layout_profile_t *p = &eeprom_screen_layout.profile[profile];
+        const size_t chunk_len = strnlen(p->scroll_text, SCROLL_MSG_LENGTH);
+        if (chunk_len > 0 && used + chunk_len + 2 < out_size)
+        {
+            memcpy(out + used, p->scroll_text, chunk_len);
+            used += chunk_len;
+            out[used++] = '\n';
+            out[used] = '\0';
+        }
+
+        for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
+        {
+            const size_t text_len = strnlen(p->static_text[i], SCREEN_STATIC_TEXT_LENGTH);
+            if (text_len > 0 && used + text_len + 2 < out_size)
+            {
+                memcpy(out + used, p->static_text[i], text_len);
+                used += text_len;
+                out[used++] = '\n';
+                out[used] = '\0';
+            }
+        }
+    }
+
+    if (used == 0 && eeprom_message[0] != '\0')
+    {
+        strncpy(out, eeprom_message, out_size - 1);
+        out[out_size - 1] = '\0';
+    }
+}
+
+#define INTEGRATION_MESSAGE_CORPUS_SIZE \
+    (SCROLL_MSG_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
+     SCREEN_STATIC_TEXT_COUNT * SCREEN_STATIC_TEXT_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + 32)
+
 void parse_integrations(void)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse integrations");
+
+    static char message_corpus[INTEGRATION_MESSAGE_CORPUS_SIZE];
+    build_integration_message_corpus(message_corpus, sizeof(message_corpus));
 
     // determine active integrations
     integration_active[INTEGRATION_HA] = (eeprom_ha_url[0] != '\0' && eeprom_ha_token[0] != '\0');
@@ -897,20 +944,20 @@ void parse_integrations(void)
     // Parse HA entities if HA integration is active
     if (integration_active[INTEGRATION_HA])
     {
-        parse_HA_entities(eeprom_message);
+        parse_HA_entities(message_corpus);
     }
 
     if (integration_active[INTEGRATION_STOCK])
     {
-        parse_stock_entities(eeprom_message);
+        parse_stock_entities(message_corpus);
     }
 
     if (integration_active[INTEGRATION_DEXCOM] || integration_active[INTEGRATION_FREESTYLE] || integration_active[INTEGRATION_NIGHTSCOUT])
     {
-        // fake two tokens for each CGM integration, [CGM:glucose] and [CGM:reading]
-        integration_active_tokens_count[INTEGRATION_DEXCOM] = 2;
-        integration_active_tokens_count[INTEGRATION_FREESTYLE] = 2;
-        integration_active_tokens_count[INTEGRATION_NIGHTSCOUT] = 2;
+        // fake three tokens for each CGM integration: [CGM:glucose], [CGM:reading], [CGM:time]
+        integration_active_tokens_count[INTEGRATION_DEXCOM] = 3;
+        integration_active_tokens_count[INTEGRATION_FREESTYLE] = 3;
+        integration_active_tokens_count[INTEGRATION_NIGHTSCOUT] = 3;
     }
 
     // force updating of the integrations
@@ -925,6 +972,32 @@ void parse_integrations(void)
 
     // Mark that tokens have been updated
     integration_tokens_updated = true;
+}
+
+static void deferred_parse_integrations_task(void *arg)
+{
+    (void)arg;
+    parse_integrations();
+    force_integration_update();
+    vTaskDelete(NULL);
+}
+
+void schedule_parse_integrations(void)
+{
+    BaseType_t created = xTaskCreatePinnedToCore(
+        deferred_parse_integrations_task,
+        "int_reparse",
+        6144,
+        NULL,
+        3,
+        NULL,
+        1);
+    if (created != pdPASS)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Deferred integration parse task create failed, parsing inline");
+        parse_integrations();
+        force_integration_update();
+    }
 }
 
 void startup_integrations(void)

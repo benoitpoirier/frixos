@@ -40,5 +40,6 @@ void f_ota_report_status(update_status_t status, const char *error_msg);
 void f_ota_start_update_thread(void);
 void f_ota_stop_update_thread(void);
 void f_ota_trigger_update(void);
+void f_ota_trigger_reinstall(void);
 
 #endif // F_OTA_H 

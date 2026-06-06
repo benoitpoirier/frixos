@@ -25,6 +25,7 @@ static time_t last_check_time = 0;
 // OTA update thread control
 TaskHandle_t ota_update_task_handle = NULL;
 SemaphoreHandle_t ota_update_semaphore = NULL;
+static volatile bool ota_reinstall_mode = false;
 
 // Internal function declarations
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress);
@@ -34,6 +35,7 @@ static void log_partition_info(const esp_partition_t *partition, const char *pre
 static void ota_handle_failure(const char *error_msg, update_status_t status, bool release_mutex);
 static void ota_handle_failure_with_cleanup(const char *error_msg, update_status_t status, esp_http_client_handle_t client, esp_ota_handle_t ota_handle, bool release_mutex);
 static void cleanup_update_files(void);
+static void f_ota_do_update(int version);
 
 // Add this function before f_ota_init
 static void log_partition_info(const esp_partition_t *partition, const char *prefix)
@@ -105,6 +107,7 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA update failed: %s", error_msg);
     update_progress(100, "Update failed"); // Signal completion to restore normal message
     ota_update_in_progress = false;
+    ota_reinstall_in_progress = false;
     ota_updating_message = false;
     ota_start_time = 0;
 
@@ -568,17 +571,26 @@ void f_ota_check_update(void)
     }
     response_len = 0;
 
-    // Start update process
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Starting update process to version %d", new_version);
+    ota_reinstall_in_progress = false;
+    f_ota_do_update(new_version);
+}
+
+static void f_ota_do_update(int version)
+{
+    char url[512] = "";
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Starting update process to version %d", version);
     xSemaphoreTake(http_mutex, portMAX_DELAY);
     update_progress(0, "Starting update...");
     ota_update_in_progress = true;
     ota_updating_message = false;
     ota_start_time = 0;
 
+    esp_err_t err;
+
     // Download SPIFFS files
     char update_dir[96];
-    snprintf(update_dir, sizeof(update_dir), "%s/%d", UPDATE_SERVER_BASE, new_version);
+    snprintf(update_dir, sizeof(update_dir), "%s/%d", UPDATE_SERVER_BASE, version);
 
     // First download the files.txt manifest; reuse url variable
     snprintf(url, sizeof(url), "%s/files.txt", update_dir);
@@ -658,7 +670,7 @@ void f_ota_check_update(void)
     // ****************
     // Download and install firmware
     // ****************
-    snprintf(url, sizeof(url), "%s/revE%d.bin", UPDATE_SERVER_BASE, new_version);
+    snprintf(url, sizeof(url), "%s/revE%d.bin", UPDATE_SERVER_BASE, version);
 
     // Get all partitions and verify their state
     const esp_partition_t *next = esp_ota_get_next_update_partition(NULL);
@@ -801,6 +813,27 @@ void f_ota_check_update(void)
     esp_restart();
 }
 
+void f_ota_reinstall_current(void)
+{
+    ESP_LOGI_STACK(TAG, "OTA Reinstall Current");
+
+    if (!wifi_connected)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi not connected, skipping OTA reinstall");
+        return;
+    }
+
+    if (ota_update_in_progress)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA update already in progress");
+        return;
+    }
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reinstalling current firmware version %d", fwversion);
+    ota_reinstall_in_progress = true;
+    f_ota_do_update(fwversion);
+}
+
 // OTA update thread function
 static void ota_update_task(void *pvParameters)
 {
@@ -809,12 +842,22 @@ static void ota_update_task(void *pvParameters)
         // Wait for the semaphore to be given
         if (xSemaphoreTake(ota_update_semaphore, portMAX_DELAY) == pdTRUE)
         {
+            bool reinstall = ota_reinstall_mode;
+            ota_reinstall_mode = false;
+
             if (wifi_connected)
             {
                 // Log stack high water mark before update
                 size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update starting - Stack free: %u bytes", (unsigned)stack_free_bytes);
-                f_ota_check_update();
+                if (reinstall)
+                {
+                    f_ota_reinstall_current();
+                }
+                else
+                {
+                    f_ota_check_update();
+                }
 
                 // Log stack high water mark after update
                 stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
@@ -880,7 +923,16 @@ void f_ota_stop_update_thread(void)
 
 void f_ota_trigger_update(void)
 {
-    // Signal the OTA update thread
+    ota_reinstall_mode = false;
+    if (ota_update_semaphore != NULL)
+    {
+        xSemaphoreGive(ota_update_semaphore);
+    }
+}
+
+void f_ota_trigger_reinstall(void)
+{
+    ota_reinstall_mode = true;
     if (ota_update_semaphore != NULL)
     {
         xSemaphoreGive(ota_update_semaphore);

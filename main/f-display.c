@@ -104,9 +104,11 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_glucose = NULL,
          *img_glucose_trend = NULL,
          *img_wifi = NULL,
-         *img_mgdl = NULL; // all the images on screen - ok, digits is off-screen
+         *img_mgdl = NULL,
+         *img_mgdl_glucose = NULL; // all the images on screen - ok, digits is off-screen
 
 lv_obj_t *label_msg = NULL;
+lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 
 // Define digit width & height (adjust based on actual sprite sheet)
 #define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
@@ -116,21 +118,27 @@ lv_obj_t *label_msg = NULL;
 #define MMOL_DECIMAL_SIDE_GAP_PX 1
 /** If LVGL has not laid out the dot image yet, assume this width (typical theme dot). */
 #define MMOL_DOT_WIDTH_FALLBACK_PX 4
+/** Gap between the right edge of digit slot 2 and the glucose unit label (standalone widget). */
+#define GLUCOSE_WIDGET_UNIT_GAP_AFTER_DIGIT2 3
+/** Trim leading space for standalone mmol/L glucose (pixels). */
+#define GLUCOSE_WIDGET_MMOL_LEADING_TRIM_PX 2
 
 #define NUM_DIGITS 4                   // the 4 time digits
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
-#define MSG_WIDTH 105                  // width of the message area
-#define MSG_EXTRA_WIDTH 7            // extra width for the message area, useful for scolling but bad for centering
+#define MSG_WIDTH 128                  // width of the message area
+#define MSG_EXTRA_WIDTH 0            // extra width for the message area, useful for scolling but bad for centering
 #define MSG_CENTER_WIDTH (MSG_WIDTH - MSG_EXTRA_WIDTH) // visible width when message is centered
 #define FADE_STEPS 14
 #define FADE_INTERVAL 200       // Time between steps in ms
 #define MAX_TOKEN_COUNT 100     // Maximum number of tokens to prevent memory issues
-#define MAX_FONT_INDEX 2        // Maximum font index (0-2)
+#define MAX_FONT_INDEX 4        // Maximum font index (0=8pt .. 4=16pt)
 #define MIN_ANIMATION_TIME 1000 // Minimum animation time in milliseconds
 
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL}; // LVGL objects for digit images
 lv_obj_t *dots[2] = {NULL, NULL};                            // Colon dots between HH and MM
+lv_obj_t *glucose_digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
+lv_obj_t *glucose_dots[2] = {NULL, NULL};
 
 /* LCD IO and panel */
 static esp_lcd_panel_io_handle_t lcd_io = NULL;
@@ -158,18 +166,116 @@ static int label_size = 0;
 static char last_scroll_msg[SCROLL_MSG_LENGTH];
 
 LV_FONT_DECLARE(frixos_8);
-LV_FONT_DECLARE(frixos_9);
-LV_FONT_DECLARE(frixos_11);
+LV_FONT_DECLARE(frixos_10);
+LV_FONT_DECLARE(frixos_12);
+LV_FONT_DECLARE(frixos_14);
+LV_FONT_DECLARE(frixos_16);
 
 static void fade_timer_cb(void *arg);
 void create_grid(lv_obj_t *scr);
+void show_object(lv_obj_t *obj, bool show);
 
 // Helper functions for modular display_task
 static void handle_als_and_brightness(uint32_t loop_counter);
 static void handle_wifi_status_icon(void);
+static void handle_screen_layout_on_wifi(void);
 static void handle_integration_and_messages(void);
+static void update_static_text_labels(void);
+static void apply_screen_layout_positions(void);
+static void apply_screen_layout_z_order(const screen_layout_profile_t *layout);
+static uint8_t screen_scroll_delay_ms(void);
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display);
 static void update_display_content(time_t now);
+static inline const screen_widget_t *active_screen_widget(screen_element_id_t id)
+{
+  return &eeprom_screen_layout.profile[font_index].widget[id];
+}
+static inline int layout_abs_x(const screen_widget_t *w)
+{
+  return w->x;
+}
+static inline int layout_abs_y(const screen_widget_t *w)
+{
+  return w->y;
+}
+
+/* Scroll message position before layout coordinates are applied (pre-WiFi). */
+#define BOOT_MSG_X 0
+#define BOOT_MSG_Y 86
+
+static bool screen_layout_positions_live = false;
+static inline uint8_t active_message_font_index(void)
+{
+  const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
+  return w_msg->font <= 4 ? w_msg->font : 0;
+}
+
+static uint8_t screen_scroll_delay_ms(void)
+{
+  return eeprom_screen_layout.scroll_delay > 0 ? eeprom_screen_layout.scroll_delay : eeprom_scroll_delay;
+}
+
+static void apply_text_widget_background(lv_obj_t *label, const screen_widget_t *w, uint8_t font_idx)
+{
+  if (font_idx > MAX_FONT_INDEX)
+    font_idx = 0;
+
+  lv_obj_set_style_pad_all(label, 0, LV_PART_MAIN);
+  /* LVGL sizes labels to font->line_height, which is taller than the nominal pt size. */
+  lv_obj_set_height(label, get_selected_font_height(font_idx));
+  lv_obj_set_style_bg_color(label, lv_color_make(w->bg_r, w->bg_g, w->bg_b), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(label, LV_OPA_COVER, LV_PART_MAIN);
+}
+
+static void apply_message_widget_styles(const screen_widget_t *w)
+{
+  if (label_msg == NULL || w == NULL)
+    return;
+
+  lv_obj_set_style_text_color(label_msg, lv_color_make(w->color_r, w->color_g, w->color_b), 0);
+  apply_text_widget_background(label_msg, w, active_message_font_index());
+}
+
+static void apply_static_text_widget(lv_obj_t *label, const screen_widget_t *w, const char *text)
+{
+  const uint8_t font_idx = w->font <= 4 ? w->font : 0;
+  lv_obj_set_style_text_font(label, get_selected_font(font_idx), 0);
+  lv_obj_set_style_text_color(label, lv_color_make(w->color_r, w->color_g, w->color_b), 0);
+  apply_text_widget_background(label, w, font_idx);
+
+  int label_w = w->width > 0 ? w->width : (LCD_H_RES - layout_abs_x(w));
+  if (label_w < 1)
+    label_w = 1;
+  lv_obj_set_width(label, label_w);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+
+  lv_text_align_t align = LV_TEXT_ALIGN_LEFT;
+  if (w->align == SCREEN_MSG_ALIGN_CENTER)
+    align = LV_TEXT_ALIGN_CENTER;
+  else if (w->align == SCREEN_MSG_ALIGN_RIGHT)
+    align = LV_TEXT_ALIGN_RIGHT;
+  lv_obj_set_style_text_align(label, align, 0);
+  if (screen_layout_positions_live)
+    lv_obj_set_pos(label, layout_abs_x(w), layout_abs_y(w));
+  lv_label_set_text(label, text);
+}
+
+static void update_static_text_labels(void)
+{
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+
+  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
+  {
+    if (label_static[i] == NULL)
+      continue;
+
+    const screen_widget_t *w = &layout->widget[SCREEN_ELEM_TEXT_1 + i];
+    char rendered[SCREEN_STATIC_TEXT_LENGTH];
+    replace_placeholders(layout->static_text[i], rendered, sizeof(rendered));
+    apply_static_text_widget(label_static[i], w, rendered);
+    show_object(label_static[i], w->enabled != 0 && time_valid);
+  }
+}
 void update_weather_msg(void);
 void display_string_substring(const char *text, int32_t x, int32_t y,
                               int32_t start_pixel, int32_t width_pixels,
@@ -418,14 +524,15 @@ void set_scroll_message(const char *msg)
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: null pointer");
     return;
   }
+  uint8_t msg_font = active_message_font_index();
   // Validate font index bounds
-  if (eeprom_msg_font > MAX_FONT_INDEX)
+  if (msg_font > MAX_FONT_INDEX)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font %d, using default", eeprom_msg_font);
-    eeprom_msg_font = 0; // Reset to default
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font %d, using default", msg_font);
+    msg_font = 0;
   }
   // Get the selected font and validate it
-  const lv_font_t *font = get_selected_font(eeprom_msg_font);
+  const lv_font_t *font = get_selected_font(msg_font);
   if (font == NULL)
   {
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font, using default");
@@ -445,31 +552,25 @@ void set_scroll_message(const char *msg)
   lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   label_size = size.x;
   label_scroll_pos = 0;
+  const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
+  apply_message_widget_styles(w_msg);
+  const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
+  const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
+
   if (label_size > MSG_CENTER_WIDTH)
   { // scrolling, left aligned
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(label_msg, LV_SIZE_CONTENT);
-    lv_obj_set_pos(label_msg, eeprom_ofs_x + MSG_WIDTH, eeprom_ofs_y + label_msg_ofs_y);
+    lv_obj_set_pos(label_msg, msg_x + MSG_WIDTH, msg_y);
     label_max_pos = (label_size);
   }
   else
   { // centered
     const int centered_label_width = MSG_CENTER_WIDTH;
-    int dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
-    if (dots[0] != NULL)
-    {
-      int measured_dot_w = lv_obj_get_width(dots[0]);
-      if (measured_dot_w > 0)
-      {
-        dot_w = measured_dot_w;
-      }
-    }
-    const int colon_center_x = eeprom_ofs_x + (2 * DIGIT_WIDTH) + 1 + (dot_w / 2);
-    const int centered_label_x = colon_center_x - (centered_label_width / 2);
 
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(label_msg, centered_label_width);
-    lv_obj_set_pos(label_msg, centered_label_x, eeprom_ofs_y + label_msg_ofs_y);
+    lv_obj_set_pos(label_msg, msg_x, msg_y);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }
@@ -492,8 +593,6 @@ void startup_display(void)
   st7735_set_rotation_and_mirror(eeprom_rotation, eeprom_mirroring);
   show_grid(eeprom_show_grid); // will create the grid if needed
 
-  // Remove eeprom_ofs_x/y assignments since we'll use eeprom_ofs_x/y directly
-
   // Set the background color to BLACK
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0); // (R,G,B)
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -501,7 +600,7 @@ void startup_display(void)
   img_logo = lv_image_create(lv_scr_act());
   lv_image_set_src(img_logo, "S:/logo.jpg");
   lv_image_set_inner_align(img_logo, LV_ALIGN_CENTER);
-  lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 20, eeprom_ofs_y + 10);
+  lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, 42, 32);
 
   label_msg = lv_label_create(lv_scr_act());
   if (label_msg == NULL)
@@ -510,20 +609,24 @@ void startup_display(void)
     return;
   }
   lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
-  lv_obj_set_height(label_msg, LV_SIZE_CONTENT);
   lv_obj_set_width(label_msg, LV_SIZE_CONTENT); // Set fixed width to match available space
-  lv_obj_set_style_text_color(label_msg, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_text_font(label_msg, get_selected_font(eeprom_msg_font), 0);
-  lv_obj_set_style_bg_color(label_msg, lv_color_black(), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(label_msg, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_text_font(label_msg, get_selected_font(active_message_font_index()), 0);
   lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
+  lv_obj_set_pos(label_msg, BOOT_MSG_X, BOOT_MSG_Y);
 
   // Optimize label for smooth scrolling
   // lv_obj_set_style_anim_speed(label_msg, 150, LV_PART_MAIN); // Optimized animation speed for smoothness
   // lv_obj_set_style_anim_time(label_msg, 1000, LV_PART_MAIN); // Base animation time
 
   set_scroll_message("Starting...");
+
+  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
+  {
+    label_static[i] = lv_label_create(lv_scr_act());
+    lv_label_set_long_mode(label_static[i], LV_LABEL_LONG_CLIP);
+    lv_obj_add_flag(label_static[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_bg_opa(label_static[i], LV_OPA_COVER, LV_PART_MAIN);
+  }
 
   img_digits_sprite = lv_image_create(lv_scr_act());
   img_weather = lv_image_create(lv_scr_act());
@@ -532,16 +635,21 @@ void startup_display(void)
   img_glucose_trend = lv_image_create(lv_scr_act());
   img_wifi = lv_image_create(lv_scr_act());
   img_mgdl = lv_image_create(lv_scr_act());
+  img_mgdl_glucose = lv_image_create(lv_scr_act());
   img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
   for (int i = 0; i < 4; i++)
   {
     digit_objs[i] = lv_image_create(lv_scr_act());
     lv_obj_add_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN); // Hide
+    glucose_digit_objs[i] = lv_image_create(lv_scr_act());
+    lv_obj_add_flag(glucose_digit_objs[i], LV_OBJ_FLAG_HIDDEN);
   }
   for (int i = 0; i < 2; i++)
   {
     dots[i] = lv_image_create(lv_scr_act());
     lv_obj_add_flag(dots[i], LV_OBJ_FLAG_HIDDEN); // Hide
+    glucose_dots[i] = lv_image_create(lv_scr_act());
+    lv_obj_add_flag(glucose_dots[i], LV_OBJ_FLAG_HIDDEN);
   }
 
   // hide objects
@@ -553,6 +661,7 @@ void startup_display(void)
   lv_obj_add_flag(img_glucose_trend, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_wifi, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_mgdl, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(img_mgdl_glucose, LV_OBJ_FLAG_HIDDEN);
   lvgl_port_unlock(); // Unlock LVGL
 
   display_changed(); // set the objects to the initial state
@@ -632,9 +741,11 @@ void show_object(lv_obj_t *obj, bool show)
 const lv_font_t *get_selected_font(uint8_t font_index)
 {
   static const lv_font_t *font_array[] = {
-      &frixos_8, // index 0
-      &frixos_9, // index 1
-      &frixos_11 // index 3
+      &frixos_8,  // index 0: 8pt (bitmap)
+      &frixos_10, // index 1: 10pt (bitmap)
+      &frixos_12, // index 2: 12pt (bitmap)
+      &frixos_14, // index 3: 14pt (bitmap)
+      &frixos_16, // index 4: 16pt (bitmap)
   };
 
   // Bounds check and return default if out of range
@@ -649,9 +760,11 @@ const lv_font_t *get_selected_font(uint8_t font_index)
 uint8_t get_selected_font_height(uint8_t font_index)
 {
   static const uint8_t height_array[] = {
-      8, // frixos_8 (index 0)
-      9, // lv_font_montserrat_8 (index 1)
-      11 // lv_font_montserrat_12 (index 3)
+      8,  // 8pt (index 0)
+      10, // 10pt (index 1)
+      12, // 12pt (index 2)
+      14, // 14pt (index 3)
+      16, // 16pt (index 4)
   };
 
   // Bounds check and return default if out of range
@@ -683,6 +796,489 @@ static bool is_glucose_fresh()
   }
 
   return is_fresh;
+}
+
+static bool layout_glucose_widget_enabled(const screen_layout_profile_t *layout)
+{
+  return layout->widget[SCREEN_ELEM_GLUCOSE].enabled;
+}
+
+static bool layout_show_time_digits(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
+  if (!w_time->enabled || !time_valid)
+    return false;
+  if (layout_glucose_widget_enabled(layout))
+    return true;
+  if (alternate_display_active && showing_glucose)
+    return false;
+  return true;
+}
+
+static bool layout_show_glucose_on_time(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
+  if (layout_glucose_widget_enabled(layout))
+    return false;
+  return w_time->enabled && alternate_display_active && showing_glucose &&
+         is_glucose_on() && is_glucose_fresh() && glucose_data.current_gl_mgdl > 0;
+}
+
+static bool layout_show_glucose_widget(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_glucose = &layout->widget[SCREEN_ELEM_GLUCOSE];
+  return w_glucose->enabled && is_glucose_on() && is_glucose_fresh() && glucose_data.current_gl_mgdl > 0;
+}
+
+typedef struct
+{
+  int digit[4];
+  bool show_dots;
+  bool is_mmol;
+} digit_display_t;
+
+static void fill_glucose_digits(digit_display_t *out, bool time_slot)
+{
+  out->show_dots = false;
+  out->is_mmol = false;
+  for (int i = 0; i < 4; i++)
+    out->digit[i] = -1;
+
+  if (!is_glucose_on() || glucose_data.current_gl_mgdl <= 0)
+    return;
+
+  if (eeprom_glucose_unit == 1)
+  {
+    float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
+    if (glucose_mmol > 22.0f)
+      glucose_mmol = 22.0f;
+    if (glucose_mmol < 0.0f)
+      glucose_mmol = 0.0f;
+    int whole_part = (int)glucose_mmol;
+    int decimal_part = (int)((glucose_mmol - whole_part) * 10.0f + 0.5f);
+    if (decimal_part >= 10)
+    {
+      whole_part++;
+      decimal_part = 0;
+    }
+    if (time_slot)
+    {
+      out->digit[0] = -1;
+      if (whole_part >= 10)
+      {
+        out->digit[1] = whole_part / 10;
+        out->digit[2] = whole_part % 10;
+        out->digit[3] = decimal_part;
+      }
+      else
+      {
+        out->digit[1] = -1;
+        out->digit[2] = whole_part;
+        out->digit[3] = decimal_part;
+      }
+    }
+    else if (whole_part >= 10)
+    {
+      out->digit[0] = whole_part / 10;
+      out->digit[1] = whole_part % 10;
+      out->digit[2] = decimal_part;
+    }
+    else
+    {
+      out->digit[1] = whole_part;
+      out->digit[2] = decimal_part;
+    }
+    out->show_dots = true;
+    out->is_mmol = true;
+  }
+  else
+  {
+    int glucose_value = (int)glucose_data.current_gl_mgdl;
+    if (glucose_value > 999)
+      glucose_value = 999;
+    if (glucose_value < 0)
+      glucose_value = 0;
+    if (time_slot)
+    {
+      out->digit[0] = -1;
+      if (glucose_value >= 100)
+      {
+        out->digit[1] = glucose_value / 100;
+        out->digit[2] = (glucose_value / 10) % 10;
+        out->digit[3] = glucose_value % 10;
+      }
+      else
+      {
+        out->digit[1] = -1;
+        out->digit[2] = glucose_value / 10;
+        out->digit[3] = glucose_value % 10;
+      }
+    }
+    else if (glucose_value >= 100)
+    {
+      out->digit[0] = glucose_value / 100;
+      out->digit[1] = (glucose_value / 10) % 10;
+      out->digit[2] = glucose_value % 10;
+    }
+    else
+    {
+      out->digit[1] = glucose_value / 10;
+      out->digit[2] = glucose_value % 10;
+    }
+  }
+}
+
+static void fill_time_digits(digit_display_t *out, struct tm *ti)
+{
+  out->show_dots = true;
+  out->is_mmol = false;
+  bool is_pm = false;
+  struct tm local = *ti;
+
+  if (eeprom_12hour)
+  {
+    if (local.tm_hour == 0)
+      local.tm_hour = 12;
+    else if (local.tm_hour > 12)
+    {
+      local.tm_hour -= 12;
+      is_pm = true;
+    }
+  }
+
+  out->digit[0] = local.tm_hour / 10;
+  out->digit[1] = local.tm_hour % 10;
+  out->digit[2] = local.tm_min / 10;
+  out->digit[3] = local.tm_min % 10;
+  if (!eeprom_show_leading_zero && out->digit[0] == 0)
+    out->digit[0] = -1;
+  (void)is_pm;
+}
+
+static void set_digit_sprite(lv_obj_t *objs[NUM_DIGITS], int position, int digit)
+{
+  if (digit < -1 || digit > 9)
+    return;
+  lv_image_set_offset_x(objs[position], -digit * DIGIT_WIDTH);
+}
+
+static void align_time_style_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                    int ox, int y, const digit_display_t *dd, bool show_dots)
+{
+  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
+  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + 1 * 18, y);
+  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 6, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * 18 + 6, y);
+  show_object(dot_objs[0], show_dots);
+  show_object(dot_objs[1], show_dots);
+  lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 1, y + 10);
+  lv_obj_align(dot_objs[1], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 1, y + 26);
+}
+
+static void align_glucose_mgdl_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                      int ox, int y, const digit_display_t *dd)
+{
+  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
+  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + 1 * 18 + 6, y);
+  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 6, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * 18 + 6, y);
+  show_object(dot_objs[0], false);
+  show_object(dot_objs[1], false);
+}
+
+static void align_glucose_mmol_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                      int ox, int y, const digit_display_t *dd)
+{
+  int dot_w = lv_obj_get_width(dot_objs[0]);
+  if (dot_w <= 0)
+    dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+
+  const int g = MMOL_DECIMAL_SIDE_GAP_PX;
+  const int shift = g + dot_w;
+  const int x0 = ox + 0 - shift;
+  const int x1 = ox + 1 * 18 + 6 - shift;
+  const int x2 = ox + 2 * 18 + 6 - shift;
+  const int x3 = x2 + DIGIT_WIDTH + g + dot_w + g;
+
+  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, x0, y);
+  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, x1, y);
+  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, x2, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, x3, y);
+  show_object(dot_objs[0], true);
+  show_object(dot_objs[1], false);
+  lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT, x2 + DIGIT_WIDTH + g, y + 30);
+}
+
+static void align_glucose_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                 int ox, int y, const digit_display_t *dd)
+{
+  if (dd->is_mmol)
+    align_glucose_mmol_digits(objs, dot_objs, ox, y, dd);
+  else
+    align_glucose_mgdl_digits(objs, dot_objs, ox, y, dd);
+}
+
+static void align_glucose_widget_mgdl_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                             int ox, int y)
+{
+  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
+  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + DIGIT_WIDTH, y);
+  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * DIGIT_WIDTH, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * DIGIT_WIDTH, y);
+  show_object(dot_objs[0], false);
+  show_object(dot_objs[1], false);
+}
+
+static int glucose_widget_mmol_dot_width(void)
+{
+  int dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+  if (glucose_dots[0])
+  {
+    int w = lv_obj_get_width(glucose_dots[0]);
+    if (w > 0)
+      dot_w = w;
+  }
+  return dot_w;
+}
+
+static void align_glucose_widget_mmol_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                             int ox, int y, const digit_display_t *dd)
+{
+  const int dot_w = glucose_widget_mmol_dot_width();
+  const int x = ox - GLUCOSE_WIDGET_MMOL_LEADING_TRIM_PX;
+  const int whole_right = x + 2 * DIGIT_WIDTH;
+  const int dot_x = whole_right;
+  const int decimal_x = dot_x + dot_w;
+
+  if (dd->digit[0] >= 0)
+    lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, x, y);
+  if (dd->digit[1] >= 0)
+    lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, x + DIGIT_WIDTH, y);
+  if (dd->digit[2] >= 0)
+    lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, decimal_x, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, x + 3 * DIGIT_WIDTH, y);
+  show_object(dot_objs[0], true);
+  show_object(dot_objs[1], false);
+  lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT, dot_x, y + 30);
+}
+
+static void align_glucose_widget_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                        int ox, int y, const digit_display_t *dd)
+{
+  if (dd->is_mmol)
+    align_glucose_widget_mmol_digits(objs, dot_objs, ox, y, dd);
+  else
+    align_glucose_widget_mgdl_digits(objs, dot_objs, ox, y);
+}
+
+static int glucose_widget_unit_x(int ox, const digit_display_t *dd)
+{
+  int digit2_left = ox + 2 * DIGIT_WIDTH;
+
+  if (dd && dd->is_mmol)
+    digit2_left = ox - GLUCOSE_WIDGET_MMOL_LEADING_TRIM_PX + 2 * DIGIT_WIDTH + glucose_widget_mmol_dot_width();
+
+  return digit2_left + DIGIT_WIDTH + GLUCOSE_WIDGET_UNIT_GAP_AFTER_DIGIT2;
+}
+
+static void render_digit_group(lv_obj_t *objs[NUM_DIGITS], const digit_display_t *dd)
+{
+  for (int i = 0; i < 4; i++)
+    set_digit_sprite(objs, i, dd->digit[i]);
+}
+
+static void update_glucose_widget_dots_visibility(bool show_widget, const digit_display_t *dd)
+{
+  const bool is_mmol = (dd && dd->is_mmol) || eeprom_glucose_unit == 1;
+  show_object(glucose_dots[1], false);
+  show_object(glucose_dots[0], show_widget && is_mmol);
+}
+
+static void apply_widget_visibility(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_weather = &layout->widget[SCREEN_ELEM_WEATHER];
+  const screen_widget_t *w_moon = &layout->widget[SCREEN_ELEM_MOON];
+  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
+
+  const bool show_time_digits = layout_show_time_digits(layout);
+  const bool show_glucose_on_time = layout_show_glucose_on_time(layout);
+  const bool show_glucose_widget = layout_show_glucose_widget(layout);
+  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time;
+
+  for (int i = 0; i < 4; i++)
+    show_object(digit_objs[i], show_time_slot_digits);
+  show_object(dots[0], show_time_slot_digits);
+  show_object(dots[1], show_time_slot_digits);
+  for (int i = 0; i < 4; i++)
+    show_object(glucose_digit_objs[i], show_glucose_widget);
+  update_glucose_widget_dots_visibility(show_glucose_widget, NULL);
+  show_object(img_ampm, show_time_digits && eeprom_12hour);
+  show_object(img_mgdl, show_glucose_on_time);
+  show_object(img_mgdl_glucose, show_glucose_widget);
+
+  show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
+  show_object(img_moon, w_moon->enabled && time_valid);
+  show_object(label_msg, w_msg->enabled || !time_valid);
+
+  if (wifi_disabled_by_active_hours)
+  {
+    show_object(img_wifi, layout->widget[SCREEN_ELEM_WIFI_OFF].enabled);
+    show_object(img_glucose, false);
+    show_object(img_glucose_trend, false);
+  }
+  else
+  {
+    show_object(img_wifi, false);
+    show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
+    show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_on() && is_glucose_fresh());
+  }
+}
+
+#define SCREEN_LAYER_MAX 4
+
+static uint8_t screen_widget_layer(const screen_widget_t *w)
+{
+  if (!w)
+    return 0;
+  return w->z <= SCREEN_LAYER_MAX ? w->z : SCREEN_LAYER_MAX;
+}
+
+static void screen_layout_push_obj(lv_obj_t *obj, lv_obj_t **objs, int *count, int max_count)
+{
+  if (obj && *count < max_count)
+    objs[(*count)++] = obj;
+}
+
+static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t **objs, int *count)
+{
+  switch (id)
+  {
+  case SCREEN_ELEM_GLUCOSE_LEVEL:
+    screen_layout_push_obj(img_glucose, objs, count, 12);
+    break;
+  case SCREEN_ELEM_GLUCOSE_TREND:
+    screen_layout_push_obj(img_glucose_trend, objs, count, 12);
+    break;
+  case SCREEN_ELEM_WIFI_OFF:
+    screen_layout_push_obj(img_wifi, objs, count, 12);
+    break;
+  case SCREEN_ELEM_WEATHER:
+    screen_layout_push_obj(img_weather, objs, count, 12);
+    break;
+  case SCREEN_ELEM_MOON:
+    screen_layout_push_obj(img_moon, objs, count, 12);
+    break;
+  case SCREEN_ELEM_TIME:
+    for (int i = 0; i < NUM_DIGITS; i++)
+      screen_layout_push_obj(digit_objs[i], objs, count, 12);
+    screen_layout_push_obj(dots[0], objs, count, 12);
+    screen_layout_push_obj(dots[1], objs, count, 12);
+    screen_layout_push_obj(img_mgdl, objs, count, 12);
+    break;
+  case SCREEN_ELEM_GLUCOSE:
+    for (int i = 0; i < NUM_DIGITS; i++)
+      screen_layout_push_obj(glucose_digit_objs[i], objs, count, 12);
+    screen_layout_push_obj(glucose_dots[0], objs, count, 12);
+    screen_layout_push_obj(glucose_dots[1], objs, count, 12);
+    screen_layout_push_obj(img_mgdl_glucose, objs, count, 12);
+    break;
+  case SCREEN_ELEM_AMPM:
+    screen_layout_push_obj(img_ampm, objs, count, 12);
+    break;
+  case SCREEN_ELEM_MESSAGE:
+    screen_layout_push_obj(label_msg, objs, count, 12);
+    break;
+  default:
+    if (screen_elem_is_static_text(id))
+      screen_layout_push_obj(label_static[screen_static_text_index(id)], objs, count, 12);
+    break;
+  }
+}
+
+static void apply_screen_layout_z_order(const screen_layout_profile_t *layout)
+{
+  int order[SCREEN_ELEM_COUNT];
+  for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
+    order[i] = i;
+
+  for (int i = 0; i < SCREEN_ELEM_COUNT - 1; i++)
+  {
+    for (int j = 0; j < SCREEN_ELEM_COUNT - i - 1; j++)
+    {
+      uint8_t zj = screen_widget_layer(&layout->widget[order[j]]);
+      uint8_t zjp1 = screen_widget_layer(&layout->widget[order[j + 1]]);
+      if (zj > zjp1 || (zj == zjp1 && order[j] > order[j + 1]))
+      {
+        int tmp = order[j];
+        order[j] = order[j + 1];
+        order[j + 1] = tmp;
+      }
+    }
+  }
+
+  for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
+  {
+    lv_obj_t *objs[12];
+    int count = 0;
+    screen_layout_collect_elem_objects((screen_element_id_t)order[i], objs, &count);
+    for (int j = 0; j < count; j++)
+      lv_obj_move_foreground(objs[j]);
+  }
+}
+
+static void apply_screen_layout_positions(void)
+{
+  if (!screen_layout_positions_live)
+    return;
+
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  const screen_widget_t *w_weather = &layout->widget[SCREEN_ELEM_WEATHER];
+  const screen_widget_t *w_moon = &layout->widget[SCREEN_ELEM_MOON];
+  const screen_widget_t *w_glucose_level = &layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL];
+  const screen_widget_t *w_wifi = &layout->widget[SCREEN_ELEM_WIFI_OFF];
+  const screen_widget_t *w_glucose_trend = &layout->widget[SCREEN_ELEM_GLUCOSE_TREND];
+  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
+  const screen_widget_t *w_glucose = &layout->widget[SCREEN_ELEM_GLUCOSE];
+  const screen_widget_t *w_ampm = &layout->widget[SCREEN_ELEM_AMPM];
+  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
+
+  lvgl_port_lock(0);
+  lv_obj_align(img_weather, LV_ALIGN_TOP_LEFT, layout_abs_x(w_weather), layout_abs_y(w_weather));
+  lv_obj_align(img_moon, LV_ALIGN_TOP_LEFT, layout_abs_x(w_moon), layout_abs_y(w_moon));
+  lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_level), layout_abs_y(w_glucose_level));
+  lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, layout_abs_x(w_wifi), layout_abs_y(w_wifi));
+  lv_obj_align(img_glucose_trend, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_trend), layout_abs_y(w_glucose_trend));
+  lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 79, layout_abs_y(w_time) + 5);
+  lv_obj_align(img_mgdl_glucose, LV_ALIGN_TOP_LEFT,
+               glucose_widget_unit_x(layout_abs_x(w_glucose), NULL),
+               layout_abs_y(w_glucose) + 5);
+
+  for (int i = 0; i < 4; i++)
+    lv_obj_align(digit_objs[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + i * 18 + (i > 1 ? 6 : 0), layout_abs_y(w_time));
+  for (int i = 0; i < 4; i++)
+    lv_obj_align(glucose_digit_objs[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose) + i * DIGIT_WIDTH, layout_abs_y(w_glucose));
+  lv_obj_align(img_ampm, LV_ALIGN_TOP_LEFT, layout_abs_x(w_ampm), layout_abs_y(w_ampm));
+  lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 2 * 18 + 1, layout_abs_y(w_time) + 10);
+  lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 2 * 18 + 1, layout_abs_y(w_time) + 26);
+  lv_obj_align(glucose_dots[0], LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose) + 2 * 18 + 1, layout_abs_y(w_glucose) + 10);
+  lv_obj_align(glucose_dots[1], LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose) + 2 * 18 + 1, layout_abs_y(w_glucose) + 26);
+  lv_obj_set_pos(label_msg, layout_abs_x(w_msg), layout_abs_y(w_msg));
+  update_static_text_labels();
+  apply_screen_layout_z_order(layout);
+  lvgl_port_unlock();
+}
+
+static void handle_screen_layout_on_wifi(void)
+{
+  static bool latched = false;
+
+  if (latched || !wifi_connected)
+    return;
+
+  latched = true;
+  screen_layout_positions_live = true;
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi connected, applying screen layout positions");
+  display_changed();
 }
 
 // this is the initialization needed when stuff about the display has changed
@@ -718,40 +1314,38 @@ void display_changed(void)
   lv_image_set_src(img_weather, buf);
   lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_weather, 32, 22);
-  lv_obj_align(img_weather, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 32, eeprom_ofs_y + 2);
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
 
   find_file(buf, sizeof(buf), eeprom_font[font_index], "moon");
   lv_image_set_src(img_moon, buf);
   lv_image_set_inner_align(img_moon, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_moon, 14, 14);
-  lv_obj_align(img_moon, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 32 + 32 + 1, eeprom_ofs_y + 7);
 
   // Load glucose icon
   find_file(buf, sizeof(buf), eeprom_font[font_index], "glucose");
   lv_image_set_src(img_glucose, buf);
   lv_image_set_inner_align(img_glucose, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_glucose, 14, 20);
-  lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 5, eeprom_ofs_y + 5);
 
   // Load WiFi disabled icon
   find_file(buf, sizeof(buf), eeprom_font[font_index], "wifi-off");
   lv_image_set_src(img_wifi, buf);
   lv_image_set_inner_align(img_wifi, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_wifi, 20, 20);
-  lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, eeprom_ofs_x, eeprom_ofs_y + 5);
 
   find_file(buf, sizeof(buf), eeprom_font[font_index], "trend");
   lv_image_set_src(img_glucose_trend, buf);
   lv_image_set_inner_align(img_glucose_trend, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_glucose_trend, 12, 14);
-  lv_obj_align(img_glucose_trend, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 5 + 14 + 1, eeprom_ofs_y + 8);
 
   // Load mgdl image
   find_file(buf, sizeof(buf), eeprom_font[font_index], "units");
   lv_image_set_src(img_mgdl, buf);
   lv_image_set_inner_align(img_mgdl, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_mgdl, 12, 24);
-  lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 79, eeprom_ofs_y + 30); // align to the right of the 4th digit
+  lv_image_set_src(img_mgdl_glucose, buf);
+  lv_image_set_inner_align(img_mgdl_glucose, LV_ALIGN_TOP_LEFT);
+  lv_obj_set_size(img_mgdl_glucose, 12, 24);
 
   find_file(buf, sizeof(buf), eeprom_font[font_index], "ampm");
   lv_image_set_src(img_ampm, buf);
@@ -767,49 +1361,31 @@ void display_changed(void)
     lv_image_set_src(digit_objs[i], lv_image_get_src(img_digits_sprite));
     lv_image_set_inner_align(digit_objs[i], LV_ALIGN_TOP_LEFT);
     lv_obj_set_size(digit_objs[i], DIGIT_WIDTH, DIGIT_HEIGHT);
-    lv_obj_align(digit_objs[i], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + i * 18 + (i > 1 ? 6 : 0), eeprom_ofs_y + 25);
-    // i>1: extra 6 pixels for the colon
+    lv_image_set_src(glucose_digit_objs[i], lv_image_get_src(img_digits_sprite));
+    lv_image_set_inner_align(glucose_digit_objs[i], LV_ALIGN_TOP_LEFT);
+    lv_obj_set_size(glucose_digit_objs[i], DIGIT_WIDTH, DIGIT_HEIGHT);
   }
-  lv_obj_align(img_ampm, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 4 * 18 + 6 + 1, eeprom_ofs_y + 32);
 
   // now setup the colon dots
   find_file(buf, sizeof(buf), eeprom_font[font_index], "dot");
   for (int i = 0; i < 2; i++)
+  {
     lv_image_set_src(dots[i], buf);
+    lv_image_set_src(glucose_dots[i], buf);
+  }
 
-  lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
-  lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
-
-  lv_obj_set_style_text_color(label_msg, lv_color_make(eeprom_msg_red[font_index], eeprom_msg_green[font_index], eeprom_msg_blue[font_index]), 0);
-  // Set the font based on eeprom_msg_font parameter
-  lv_obj_set_style_text_font(label_msg, get_selected_font(eeprom_msg_font), 0);
+  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
+  lv_obj_set_style_text_font(label_msg, get_selected_font(active_message_font_index()), 0);
+  apply_message_widget_styles(w_msg);
   // Invalidate character width cache when font changes
   invalidate_char_width_cache();
-  lv_obj_set_height(label_msg, LV_SIZE_CONTENT);
-  lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
 
-  show_object(img_ampm, eeprom_12hour && time_valid);                                  // show AM/PM indicator if 12 hour time AND we have valid time
-  show_object(img_weather, eeprom_quiet_weather && last_weather_update && time_valid); // show weather forecast icon if weather data is valid
-  show_object(img_moon, eeprom_quiet_weather && time_valid);                           // show moon icon if we have valid time
-  show_object(label_msg, eeprom_quiet_scroll || !time_valid);                          // show scrolling information message if quiet scroll is enabled or time is not valid
-
-  // Show/hide glucose icon, WiFi icon, and trend arrow
-  if (wifi_disabled_by_active_hours)
-  {
-    show_object(img_wifi, true);
-    show_object(img_glucose, false);
-    show_object(img_glucose_trend, false); // Hide trend arrow when WiFi is disabled
-    show_object(img_mgdl, false);          // Hide mgdl when WiFi is disabled
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi off, trend arrow hidden");
-  }
-  else
-  {
-    show_object(img_wifi, false);
-  }
-
-  if (weather_valid) // only if we have valid weather data
-    update_weather_msg();
+  apply_widget_visibility(layout);
+  if (!screen_layout_positions_live)
+    update_static_text_labels();
   lvgl_port_unlock(); // Unlock LVGL
+
+  apply_screen_layout_positions();
 
   // Apply gamma curve based on eeprom_color_filter, after we get on wifi
   if (wifi_connected)
@@ -890,7 +1466,8 @@ void update_weather_msg(void)
 {
   lvgl_port_lock(0);
   integration_tokens_updated = true; // signal that tokens have been updated
-  show_object(img_weather, eeprom_quiet_weather && last_weather_update > 0);
+  const bool weather_enabled = eeprom_screen_layout.profile[font_index].widget[SCREEN_ELEM_WEATHER].enabled;
+  show_object(img_weather, weather_enabled && weather_valid && time_valid);
   lvgl_port_unlock();
 }
 
@@ -898,7 +1475,7 @@ void show_qr_code(void)
 {
   lvgl_port_lock(0);
   lv_image_set_src(img_logo, "S:/wifi-qr.jpg");
-  lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 15, eeprom_ofs_y + 10);
+  lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, 37, 32);
   set_scroll_message(" Scan QR code to connect to your Frixos ");
   lvgl_port_unlock();
 }
@@ -937,33 +1514,48 @@ static void watchdog_callback(void *arg)
 static int last_integration_update_hour = -1; // Track last hour we updated integration message
 static time_t lastrun = 0;
 
+static bool is_time_of_day_bright(void)
+{
+  time_t now;
+  struct tm timeinfo;
+
+  time(&now);
+  localtime_r(&now, &timeinfo);
+  if (timeinfo.tm_year + 1900 <= 2025)
+    return true;
+
+  return is_hour_in_range(eeprom_dim_start, eeprom_dim_end, timeinfo.tm_hour);
+}
+
 static void handle_als_and_brightness(uint32_t loop_counter)
 {
-  // read ALS sensor every 5 seconds. each pass is 50ms, so 100 passes = 5 seconds
-  if (loop_counter % 100 == 1)
+  uint8_t old_font_index = font_index;
+
+  if (manufacturer_mode || eeprom_dim_mode == DIM_MODE_FULL)
   {
-    // Get the current lux value
+    font_index = 0;
+  }
+  else if (eeprom_dim_mode == DIM_MODE_TIME)
+  {
+    font_index = is_time_of_day_bright() ? 0 : 1;
+  }
+  else if (loop_counter % 100 == 1)
+  {
+    // read ALS sensor every 5 seconds. each pass is 50ms, so 100 passes = 5 seconds
     lux = ltr303_get_frixos_lux();
-    int8_t pwmpct = -1;
-    uint8_t old_font_index = font_index;
 
     if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
       font_index = 0;
     else if (lux < eeprom_lux_threshold - eeprom_lux_sensitivity)
       font_index = 1;
+  }
 
-    // if dim_disable is enabled or we are in manufacturer mode, force full brightness
-    if (eeprom_dim_disable || manufacturer_mode)
-      font_index = 0; // force full brightness
-
-    pwmpct = eeprom_brightness_LED[font_index];
-    if (font_index != old_font_index)
-    {
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (lux %.1f thres %.1f)",
-                  old_font_index, font_index, lux, eeprom_lux_threshold);
-      set_led_pwm_brightness(pwmpct);
-      display_changed();
-    }
+  if (font_index != old_font_index)
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (mode %u lux %.1f thres %.1f)",
+                old_font_index, font_index, eeprom_dim_mode, lux, eeprom_lux_threshold);
+    set_led_pwm_brightness(eeprom_brightness_LED[font_index]);
+    display_changed();
   }
 }
 
@@ -976,14 +1568,15 @@ static void handle_wifi_status_icon(void)
     lvgl_port_lock(0);
     if (wifi_disabled_by_active_hours)
     {
-      show_object(img_wifi, true);
+      const bool wifi_enabled = eeprom_screen_layout.profile[font_index].widget[SCREEN_ELEM_WIFI_OFF].enabled;
+      show_object(img_wifi, wifi_enabled);
       show_object(img_glucose, false);
       show_object(img_glucose_trend, false);
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disabled (active hours)");
     }
     else
     {
-      show_object(img_wifi, false);
+      apply_widget_visibility(&eeprom_screen_layout.profile[font_index]);
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi enabled");
     }
     lvgl_port_unlock();
@@ -1008,8 +1601,9 @@ static void handle_integration_and_messages(void)
       lvgl_port_lock(0);
       lv_image_set_offset_x(img_glucose, -glucose_index * 14);
       lv_image_set_offset_x(img_glucose_trend, -glucose_data.trend_arrow * 12);
-      show_object(img_glucose, is_glucose_on());
-      show_object(img_glucose_trend, is_glucose_fresh());
+      const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+      show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
+      show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_fresh());
       lvgl_port_unlock();
     }
     else
@@ -1020,7 +1614,7 @@ static void handle_integration_and_messages(void)
       lvgl_port_unlock();
     }
 
-    // IP address and OTA "updating..." message display handling
+    // IP address and OTA "updating..." / "reinstalling..." message display handling
     if (show_ip_on_boot && !ip_message_set)
     {
       char ip_message[64];
@@ -1034,16 +1628,18 @@ static void handle_integration_and_messages(void)
     }
     else if (!ota_update_in_progress && !show_ip_on_boot)
     {
-      replace_placeholders(eeprom_message, msg_scrolling, sizeof(msg_scrolling));
+      const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+      replace_placeholders(layout->scroll_text, msg_scrolling, sizeof(msg_scrolling));
       lvgl_port_lock(0);
       set_scroll_message(msg_scrolling);
+      update_static_text_labels();
       lvgl_port_unlock();
     }
     else if (ota_update_in_progress)
     {
       if (!ota_updating_message)
       {
-        set_scroll_message("Updating...");
+        set_scroll_message(ota_reinstall_in_progress ? "Reinstalling..." : "Updating...");
         ota_updating_message = true;
       }
       if (ota_start_time == 0)
@@ -1052,6 +1648,7 @@ static void handle_integration_and_messages(void)
       {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
         ota_update_in_progress = false;
+        ota_reinstall_in_progress = false;
         ota_updating_message = false;
         ota_start_time = 0;
       }
@@ -1083,8 +1680,10 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
     time_t current_minute_slot = now / 60;
     bool minute_changed = (current_minute_slot != last_minute_slot);
 
-    /* Alternate only when both phases have a non-zero duration; otherwise keep the clock on the digits. */
-    alternate_display_active = (eeprom_sec_time > 0 && eeprom_sec_cgm > 0);
+    /* Alternate on the time slot only when a dedicated glucose widget is not enabled. */
+    const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+    const bool can_alternate = !layout_glucose_widget_enabled(layout);
+    alternate_display_active = can_alternate && (eeprom_sec_time > 0 && eeprom_sec_cgm > 0);
 
     static time_t last_alternate_display_start = 0;
     if (alternate_display_start == 0 && last_alternate_display_start != 0)
@@ -1161,124 +1760,83 @@ static void update_display_content(time_t now)
     weather_has_updated = false;
   }
 
-  int digit1, digit2, digit3, digit4;
-  bool show_dots = true;
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  const bool show_time_digits = layout_show_time_digits(layout);
+  const bool show_glucose_on_time = layout_show_glucose_on_time(layout);
+  const bool show_glucose_widget = layout_show_glucose_widget(layout);
+  digit_display_t time_digits = {0};
+  digit_display_t glucose_digits = {0};
   bool show_ampm = false;
 
-  if (showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0)
+  if (show_glucose_on_time)
+    fill_glucose_digits(&glucose_digits, true);
+  else if (show_time_digits)
   {
-    if (eeprom_glucose_unit == 1)
-    {
-      float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
-      if (glucose_mmol > 22.0f) glucose_mmol = 22.0f;
-      if (glucose_mmol < 0.0f) glucose_mmol = 0.0f;
-      int whole_part = (int)glucose_mmol;
-      int decimal_part = (int)((glucose_mmol - whole_part) * 10.0f + 0.5f);
-      if (decimal_part >= 10) { whole_part++; decimal_part = 0; }
-      digit1 = -1;
-      if (whole_part >= 10) { digit2 = whole_part / 10; digit3 = whole_part % 10; digit4 = decimal_part; }
-      else { digit2 = -1; digit3 = whole_part; digit4 = decimal_part; }
-      show_dots = true;
-      show_ampm = false;
-    }
-    else
-    {
-      int glucose_value = (int)glucose_data.current_gl_mgdl;
-      if (glucose_value > 999) glucose_value = 999;
-      if (glucose_value < 0) glucose_value = 0;
-      digit1 = -1;
-      if (glucose_value >= 100) { digit2 = glucose_value / 100; digit3 = (glucose_value / 10) % 10; digit4 = glucose_value % 10; }
-      else { digit2 = -1; digit3 = glucose_value / 10; digit4 = glucose_value % 10; }
-      show_dots = false;
-      show_ampm = false;
-    }
-  }
-  else
-  {
+    struct tm local = timeinfo;
     bool is_pm = false;
     if (eeprom_12hour)
     {
-      if (timeinfo.tm_hour == 0) timeinfo.tm_hour = 12;
-      else if (timeinfo.tm_hour > 12) { timeinfo.tm_hour -= 12; is_pm = true; }
+      if (local.tm_hour == 0)
+        local.tm_hour = 12;
+      else if (local.tm_hour > 12)
+      {
+        local.tm_hour -= 12;
+        is_pm = true;
+      }
     }
-    digit1 = timeinfo.tm_hour / 10;
-    digit2 = timeinfo.tm_hour % 10;
-    digit3 = timeinfo.tm_min / 10;
-    digit4 = timeinfo.tm_min % 10;
-    if (!eeprom_show_leading_zero && digit1 == 0) digit1 = -1;
-    show_dots = true;
-    show_ampm = (eeprom_12hour && is_pm);
+    fill_time_digits(&time_digits, &local);
+    show_ampm = eeprom_12hour && is_pm;
   }
+
+  if (show_glucose_widget)
+    fill_glucose_digits(&glucose_digits, false);
 
   lvgl_port_lock(0);
-  display_digit(0, digit1);
-  display_digit(1, digit2);
-  display_digit(2, digit3);
-  display_digit(3, digit4);
+  if (show_glucose_on_time)
+    render_digit_group(digit_objs, &glucose_digits);
+  else if (show_time_digits)
+    render_digit_group(digit_objs, &time_digits);
 
-  const int y_digits = eeprom_ofs_y + 25;
+  if (show_glucose_widget)
+    render_digit_group(glucose_digit_objs, &glucose_digits);
 
-  if (showing_glucose && alternate_display_active && eeprom_glucose_unit == 1)
+  if (screen_layout_positions_live)
   {
-    int dot_w = lv_obj_get_width(dots[0]);
-    if (dot_w <= 0)
-      dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+    const screen_widget_t *w_time = active_screen_widget(SCREEN_ELEM_TIME);
+    const screen_widget_t *w_glucose = active_screen_widget(SCREEN_ELEM_GLUCOSE);
+    const int ox = layout_abs_x(w_time);
+    const int y_digits = layout_abs_y(w_time);
 
-    const int g = MMOL_DECIMAL_SIDE_GAP_PX;
-    /* Shift integer digits (slots 0–2) left so tenths + dot fit before the units label. */
-    const int shift = g + dot_w;
+    if (show_glucose_on_time)
+      align_glucose_digits(digit_objs, dots, ox, y_digits, &glucose_digits);
+    else if (show_time_digits)
+      align_time_style_digits(digit_objs, dots, ox, y_digits, &time_digits, true);
 
-    const int gly_x0 = eeprom_ofs_x + 0;
-    const int gly_x1 = eeprom_ofs_x + 1 * 18 + 6;
-    const int gly_x2 = eeprom_ofs_x + 2 * 18 + 6;
-    const int x0 = gly_x0 - shift;
-    const int x1 = gly_x1 - shift;
-    const int x2 = gly_x2 - shift;
-    const int x3 = x2 + DIGIT_WIDTH + g + dot_w + g;
+    if (show_glucose_widget)
+    {
+      const int gx = layout_abs_x(w_glucose);
+      const int gy = layout_abs_y(w_glucose);
+      align_glucose_widget_digits(glucose_digit_objs, glucose_dots, gx, gy, &glucose_digits);
+      lv_obj_align(img_mgdl_glucose, LV_ALIGN_TOP_LEFT, glucose_widget_unit_x(gx, &glucose_digits), gy + 5);
+    }
 
-    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, x0, y_digits);
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, x1, y_digits);
-    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, x2, y_digits);
-    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, x3, y_digits);
-    show_object(img_ampm, false);
-
-    show_object(dots[0], true);
-    show_object(dots[1], false);
-    const int dot_x = x2 + DIGIT_WIDTH + g;
-    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, dot_x, eeprom_ofs_y + 25 + 30);
+    show_object(img_ampm, show_time_digits && eeprom_12hour);
   }
-  else if (showing_glucose && alternate_display_active)
-  {
-    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
-    show_object(img_ampm, false);
 
-    show_object(dots[0], show_dots);
-    show_object(dots[1], show_dots);
-    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
-    lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
-  }
-  else
-  {
-    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18, y_digits);
-    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
-    show_object(img_ampm, eeprom_12hour && time_valid);
-
-    show_object(dots[0], show_dots);
-    show_object(dots[1], show_dots);
-    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
-    lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
-  }
+  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time;
+  for (int i = 0; i < 4; i++)
+    show_object(digit_objs[i], show_time_slot_digits);
+  for (int i = 0; i < 4; i++)
+    show_object(glucose_digit_objs[i], show_glucose_widget && glucose_digits.digit[i] >= 0);
+  update_glucose_widget_dots_visibility(show_glucose_widget, &glucose_digits);
 
   lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
   lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
-  show_object(img_mgdl, showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0);
+  show_object(img_mgdl, show_glucose_on_time);
+  show_object(img_mgdl_glucose, show_glucose_widget);
   lv_image_set_offset_x(img_mgdl, -eeprom_glucose_unit * 12);
+  lv_image_set_offset_x(img_mgdl_glucose, -eeprom_glucose_unit * 12);
   lvgl_port_unlock();
 
   last_minute = timeinfo.tm_min;
@@ -1289,12 +1847,9 @@ static void update_display_content(time_t now)
     time_just_validated = 0;
     lvgl_port_lock(0);
     if (img_logo) lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);
-    for (int i = 0; i < 4; i++) lv_obj_remove_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(img_moon, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(dots[0], LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(dots[1], LV_OBJ_FLAG_HIDDEN);
+    apply_widget_visibility(&eeprom_screen_layout.profile[font_index]);
+    update_static_text_labels();
     lvgl_port_unlock();
-    if (weather_valid) update_weather_msg();
   }
   lastrun = now;
 }
@@ -1339,9 +1894,11 @@ void display_task(void *pvParameters)
       alternate_display_start = 0;
       showing_glucose = false;
       display_changed();
+      update_display_content(now);
       settings_updated = false;
     }
 
+    handle_screen_layout_on_wifi();
     handle_wifi_status_icon();
     handle_integration_and_messages();
     handle_als_and_brightness(loop_counter);
@@ -1422,8 +1979,13 @@ void display_task(void *pvParameters)
 
       // display_string_substring() already acquires/releases the LVGL lock.
       // Taking lvgl_port_lock() here causes a self-deadlock in the display task.
-      display_string_substring(msg_scrolling, (eeprom_ofs_x > 6 ? eeprom_ofs_x - 6 : eeprom_ofs_x), eeprom_ofs_y + label_msg_ofs_y,
-                               label_scroll_pos, MSG_WIDTH, label_msg, get_selected_font(eeprom_msg_font));
+      {
+        const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
+        const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
+        const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
+        display_string_substring(msg_scrolling, (msg_x > 6 ? msg_x - 6 : msg_x), msg_y,
+                                 label_scroll_pos, MSG_WIDTH, label_msg, get_selected_font(active_message_font_index()));
+      }
     }
 
     // NOTE: Do NOT call lv_task_handler() here! The esp_lvgl_port creates its own
@@ -1437,7 +1999,7 @@ void display_task(void *pvParameters)
     display_task_heartbeat++;
 
     // vTaskDelay(pdMS_TO_TICKS(eeprom_scroll_delay));
-    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(eeprom_scroll_delay)); // this is probably causing jumpy scrolling
+    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(screen_scroll_delay_ms()));
   } // end of while (1) loop
 
   ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exit (unexpected)");
@@ -1530,11 +2092,11 @@ void prepare_tokens(void)
       tokencount += integration_active_tokens_count[i];
   }
 
-  // Add space for CGM tokens (2 tokens per active CGM integration: [CGM:glucose] and [CGM:reading])
+  // Add space for CGM tokens (3 per active CGM integration: [CGM:glucose], [CGM:reading], [CGM:time])
   // These tokens are always added when integration is active, regardless of token array
   if (integration_active[INTEGRATION_DEXCOM] || integration_active[INTEGRATION_FREESTYLE] || integration_active[INTEGRATION_NIGHTSCOUT])
   {
-    tokencount += 2;
+    tokencount += 3;
   }
 
   // Add safety check for reasonable token count
@@ -1604,6 +2166,14 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
     all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
+
+    // Add [CGM:time] token
+    all_tokens[prepared_tokens_count].token = "[CGM:time]";
+    all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
+    all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
+    all_tokens[prepared_tokens_count].value = NULL;
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
+    prepared_tokens_count++;
   }
   // Check if Freestyle Libre is active
   else if (integration_active[INTEGRATION_FREESTYLE])
@@ -1623,6 +2193,14 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
     all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
+
+    // Add [CGM:time] token
+    all_tokens[prepared_tokens_count].token = "[CGM:time]";
+    all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
+    all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
+    all_tokens[prepared_tokens_count].value = NULL;
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
+    prepared_tokens_count++;
   }
   else if (integration_active[INTEGRATION_NIGHTSCOUT])
   {
@@ -1639,6 +2217,14 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
+    prepared_tokens_count++;
+
+    // Add [CGM:time] token
+    all_tokens[prepared_tokens_count].token = "[CGM:time]";
+    all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
+    all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
+    all_tokens[prepared_tokens_count].value = NULL;
     all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
   }
@@ -1936,7 +2522,7 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
             break;
 
           case TOKEN_TYPE_GLUCOSE:
-            // Check if this is [CGM:reading] (plain) or [CGM:glucose] (formatted)
+            // [CGM:reading] (plain), [CGM:time], or [CGM:glucose] (formatted)
             // Format directly from glucose_data (no token arrays for Dexcom/Freestyle/Nightscout)
             if (integration_active[INTEGRATION_DEXCOM] || integration_active[INTEGRATION_FREESTYLE] || integration_active[INTEGRATION_NIGHTSCOUT])
             {
@@ -1944,12 +2530,14 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
               {
                 if (strcmp(token->token, "[CGM:reading]") == 0)
                 {
-                  // Plain reading - just the number
                   get_glucose_reading_plain(replacement, sizeof(replacement));
+                }
+                else if (strcmp(token->token, "[CGM:time]") == 0)
+                {
+                  format_glucose_time_token(replacement, sizeof(replacement));
                 }
                 else
                 {
-                  // Formatted reading - [CGM:glucose]
                   format_glucose_token(replacement, sizeof(replacement));
                 }
               }

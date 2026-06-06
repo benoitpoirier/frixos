@@ -977,6 +977,62 @@ bool fetch_freestyle_glucose(void)
     return false;
 }
 
+// Language-specific AM/PM suffixes for 12-hour time display
+// Language index: 0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl, 8=es
+static const char *ampm_suffix[9][2] = {
+    {"am", "pm"},        // English
+    {"vorm.", "nachm."}, // German
+    {"mat.", "apr."},    // French
+    {"matt.", "pom."},   // Italian
+    {"man.", "tar."},    // Portuguese
+    {"fm", "em"},        // Swedish
+    {"fm", "em"},        // Danish
+    {"AM", "PM"},        // Polish
+    {"a.m.", "p.m."},    // Spanish
+};
+
+static void format_local_time(char *buffer, size_t buffer_size, const struct tm *timeinfo)
+{
+    uint8_t lang_index = eeprom_language;
+    if (lang_index >= 9)
+    {
+        lang_index = 0;
+    }
+
+    if (eeprom_12hour)
+    {
+        bool is_pm = timeinfo->tm_hour >= 12;
+        int hour = timeinfo->tm_hour;
+        if (hour == 0)
+        {
+            hour = 12;
+        }
+        else if (hour > 12)
+        {
+            hour -= 12;
+        }
+        snprintf(buffer, buffer_size, "%d:%02d%s", hour, timeinfo->tm_min,
+                 ampm_suffix[lang_index][is_pm ? 1 : 0]);
+    }
+    else
+    {
+        snprintf(buffer, buffer_size, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
+    }
+}
+
+void format_glucose_time_token(char *buffer, size_t buffer_size)
+{
+    if (glucose_data.current_gl_mgdl <= 0)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    struct tm timeinfo;
+    localtime_r(&glucose_data.timestamp, &timeinfo);
+    format_local_time(buffer, buffer_size, &timeinfo);
+}
+
 void format_glucose_token(char *buffer, size_t buffer_size)
 {
     if (glucose_data.current_gl_mgdl <= 0)
@@ -988,14 +1044,7 @@ void format_glucose_token(char *buffer, size_t buffer_size)
     struct tm timeinfo;
     localtime_r(&glucose_data.timestamp, &timeinfo);
     char time_str[32];
-    if (eeprom_12hour)
-    {
-        strftime(time_str, sizeof(time_str), "%I:%M%p", &timeinfo);
-    }
-    else
-    {
-        strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
-    }
+    format_local_time(time_str, sizeof(time_str), &timeinfo);
 
     if (eeprom_glucose_unit == 1)
     {

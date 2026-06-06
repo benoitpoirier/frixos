@@ -44,6 +44,7 @@ Main task stack size
 #include "esp_mac.h"
 #include "esp_check.h"
 #include "esp_spiffs.h"
+#include "nvs.h"
 
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
@@ -76,6 +77,8 @@ extern char eeprom_wifi_ssid[33];
 extern char eeprom_wifi_pass[64];
 extern uint8_t eeprom_wifi_start;  // WiFi Active Hours Start (0-23)
 extern uint8_t eeprom_wifi_end;    // WiFi Active Hours End (0-23)
+extern uint8_t eeprom_dim_start;   // Time-of-day dimming start hour (0-23)
+extern uint8_t eeprom_dim_end;     // Time-of-day dimming end hour (0-23)
 extern char eeprom_lat[12], my_lat[12];                         // "48.123456";
 extern char eeprom_lon[12], my_lon[12];                         // "16.123456";
 extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.5.0/3,M10.5.0/4";
@@ -83,7 +86,10 @@ extern char eeprom_font[2][12]; // [0] = day font, [1] = night font
 extern float eeprom_lux_sensitivity;
 extern float eeprom_lux_threshold;
 extern uint8_t eeprom_brightness_LED[2]; // in pct
-extern uint8_t  eeprom_dim_disable;
+#define DIM_MODE_BRIGHTNESS 0
+#define DIM_MODE_FULL 1
+#define DIM_MODE_TIME 2
+extern uint8_t eeprom_dim_mode; // p22: 0=brightness, 1=full, 2=time-of-day
 extern uint8_t  eeprom_fahrenheit;
 extern uint8_t  eeprom_12hour;
 extern uint8_t  eeprom_quiet_scroll;
@@ -94,7 +100,7 @@ extern uint8_t  eeprom_color_filter[2]; // [0] = day filter, [1] = night filter
 extern uint8_t  eeprom_msg_red[2];      // [0] = day red, [1] = night red
 extern uint8_t  eeprom_msg_green[2];    // [0] = day green, [1] = night green
 extern uint8_t  eeprom_msg_blue[2];     // [0] = day blue, [1] = night blue
-extern uint8_t  eeprom_msg_font;        // Message font size (0=Frixos8, 1=Montserrat8, 2=Montserrat10, 3=Montserrat12, 4=Montserrat14)
+extern uint8_t  eeprom_msg_font;        // Message font size (0=8pt, 1=10pt, 2=12pt, 3=14pt, 4=16pt)
 extern uint8_t  eeprom_ofs_x;
 extern uint8_t  eeprom_ofs_y;
 extern uint8_t  eeprom_rotation;
@@ -138,6 +144,8 @@ extern glucose_data_t glucose_data;  // Unified glucose data storage
 
 // Unified glucose formatting function (used by both Dexcom and Freestyle)
 void format_glucose_token(char *buffer, size_t buffer_size);
+// Time of latest CGM measurement (12/24hr per settings, localized am/pm suffix)
+void format_glucose_time_token(char *buffer, size_t buffer_size);
 // Get plain glucose reading (just the number, no formatting)
 void get_glucose_reading_plain(char *buffer, size_t buffer_size);
 
@@ -175,6 +183,7 @@ extern time_t first_time_sync;
 
 extern time_t ota_start_time;
 extern bool ota_update_in_progress;
+extern bool ota_reinstall_in_progress;
 extern bool ota_updating_message;
 
 // IP address display on boot
@@ -184,6 +193,92 @@ extern int64_t ip_display_start_time;  // Changed to int64_t for esp_timer_get_t
 extern char boot_ip_address[18];
 
 #define IP_DISPLAY_DURATION_SEC 15
+
+// --------------------------
+// Screen layout configuration
+// --------------------------
+// Two profiles: [0]=day, [1]=night. Selected at runtime by font_index (lux-driven).
+#define FRIXOS_SCREEN_LAYOUT_VERSION 7
+#define FRIXOS_SCREEN_LAYOUT_PROFILES 2
+#define SCREEN_STATIC_TEXT_LENGTH 96
+#define SCREEN_STATIC_TEXT_COUNT 5
+
+#define SCREEN_MSG_ALIGN_LEFT 0
+#define SCREEN_MSG_ALIGN_CENTER 1
+#define SCREEN_MSG_ALIGN_RIGHT 2
+
+typedef enum
+{
+  SCREEN_ELEM_GLUCOSE_LEVEL = 0,
+  SCREEN_ELEM_GLUCOSE_TREND = 1,
+  SCREEN_ELEM_WIFI_OFF = 2,
+  SCREEN_ELEM_WEATHER = 3,
+  SCREEN_ELEM_MOON = 4,
+  SCREEN_ELEM_TIME = 5,
+  SCREEN_ELEM_MESSAGE = 6,
+  SCREEN_ELEM_TEXT_1 = 7,
+  SCREEN_ELEM_TEXT_2 = 8,
+  SCREEN_ELEM_TEXT_3 = 9,
+  SCREEN_ELEM_TEXT_4 = 10,
+  SCREEN_ELEM_TEXT_5 = 11,
+  SCREEN_ELEM_AMPM = 12,
+  SCREEN_ELEM_GLUCOSE = 13,
+  SCREEN_ELEM_COUNT
+} screen_element_id_t;
+
+typedef struct
+{
+  uint8_t enabled; // 0/1
+  uint8_t x;       // 0..127 absolute screen coordinate
+  uint8_t y;       // 0..127 absolute screen coordinate
+  uint8_t z;       // 0..4 layer index, higher = on top
+  uint8_t font;    // 0..4 (8pt..16pt) for message/text elements
+  uint8_t width;   // static text clip width in pixels, 0 = no limit
+  uint8_t align;   // SCREEN_MSG_ALIGN_* for message/text elements
+  uint8_t color_r;
+  uint8_t color_g;
+  uint8_t color_b;
+  uint8_t bg_r;
+  uint8_t bg_g;
+  uint8_t bg_b;
+} screen_widget_t;
+
+typedef struct
+{
+  screen_widget_t widget[SCREEN_ELEM_COUNT];
+  char scroll_text[SCROLL_MSG_LENGTH];
+  char static_text[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
+} screen_layout_profile_t;
+
+typedef struct
+{
+  uint8_t version;
+  uint8_t scroll_delay; // milliseconds, scrolling message only
+  uint16_t reserved;
+  screen_layout_profile_t profile[FRIXOS_SCREEN_LAYOUT_PROFILES];
+} screen_layout_t;
+
+extern screen_layout_t eeprom_screen_layout;
+
+static inline bool screen_elem_is_static_text(screen_element_id_t id)
+{
+  return id >= SCREEN_ELEM_TEXT_1 && id <= SCREEN_ELEM_TEXT_5;
+}
+
+static inline bool screen_elem_is_text(screen_element_id_t id)
+{
+  return id == SCREEN_ELEM_MESSAGE || screen_elem_is_static_text(id);
+}
+
+static inline int screen_static_text_index(screen_element_id_t id)
+{
+  return (int)id - (int)SCREEN_ELEM_TEXT_1;
+}
+
+void build_integration_message_corpus(char *out, size_t out_size);
+void screen_layout_apply_factory_defaults(screen_layout_t *layout);
+void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout);
+void screen_layout_ensure_valid(void);
 
 // TFT Displat ST7735S
 /* LCD size */

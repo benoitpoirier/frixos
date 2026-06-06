@@ -55,7 +55,7 @@ NUMBER_DESCRIPTIONS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key=PARAM_LUX_SENSITIVITY,
-        name="Light Sensitivity",
+        name="Sensitivity",
         icon="mdi:brightness-6",
         native_min_value=0,
         native_max_value=50,

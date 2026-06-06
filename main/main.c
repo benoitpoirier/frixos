@@ -46,9 +46,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.30";
+const char version[10] = "2.40b";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 66;
+const int fwversion = 67;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 
@@ -81,7 +81,6 @@ typedef struct {
 LV_FONT_DECLARE(lv_font_montserrat_8);
 LV_FONT_DECLARE(lv_font_montserrat_10);
 LV_FONT_DECLARE(lv_font_montserrat_12);
-LV_FONT_DECLARE(lv_font_montserrat_14);
 
 // EEPROM parameters and default values
 char eeprom_hostname[33] = "frixos";
@@ -89,14 +88,16 @@ char eeprom_wifi_ssid[33] = "";
 char eeprom_wifi_pass[64] = "";
 uint8_t eeprom_wifi_start = 0;                                     // WiFi Active Hours Start (0-23), default 0
 uint8_t eeprom_wifi_end = 0;                                       // WiFi Active Hours End (0-23), default 0
+uint8_t eeprom_dim_start = 0;                                      // Time-of-day dimming start (0-23), default 0
+uint8_t eeprom_dim_end = 0;                                        // Time-of-day dimming end (0-23), default 0
 char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
 char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
 float eeprom_lux_sensitivity = 6.0;
 float eeprom_lux_threshold = 16.0;
-uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pctuint8_t eeprom_dim_disable = 0;
-uint8_t eeprom_dim_disable = 0;
+uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
+uint8_t eeprom_dim_mode = DIM_MODE_BRIGHTNESS;
 uint8_t eeprom_fahrenheit = 1;
 uint8_t eeprom_12hour = 1;
 uint8_t eeprom_quiet_scroll = 1;
@@ -107,7 +108,7 @@ uint8_t eeprom_color_filter[2] = {0, 0};  // [0] = day, [1] = night
 uint8_t eeprom_msg_red[2] = {255, 255};   // Default to white color for both day and night
 uint8_t eeprom_msg_green[2] = {255, 255}; // Default to white color for both day and night
 uint8_t eeprom_msg_blue[2] = {255, 255};  // Default to white color for both day and night
-uint8_t eeprom_msg_font = 0;              // Default to Frixos 8 (0=Frixos8, 1=Montserrat8, 2=Montserrat10, 3=Montserrat12, 4=Montserrat14)
+uint8_t eeprom_msg_font = 0;              // Default to 8pt (0=8pt, 1=10pt, 2=12pt, 3=14pt, 4=16pt)
 uint8_t eeprom_ofs_x = 22;
 uint8_t eeprom_ofs_y = 22;
 uint8_t eeprom_rotation = 3;        // 0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°
@@ -120,6 +121,8 @@ uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
 uint8_t eeprom_scroll_delay = 65;   // Default scroll delay in milliseconds (30-500)
 char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
 
+screen_layout_t eeprom_screen_layout = {0};
+
 static const nvs_setting_t settings_table[] = {
     {"wifi_ssid", SETTING_TYPE_STR, eeprom_wifi_ssid, sizeof(eeprom_wifi_ssid)},
     {"wifi_pass", SETTING_TYPE_STR, eeprom_wifi_pass, sizeof(eeprom_wifi_pass)},
@@ -129,7 +132,9 @@ static const nvs_setting_t settings_table[] = {
     {"timezone", SETTING_TYPE_STR, eeprom_timezone, sizeof(eeprom_timezone)},
     {"dayfont", SETTING_TYPE_STR, eeprom_font[0], sizeof(eeprom_font[0])},
     {"nightfont", SETTING_TYPE_STR, eeprom_font[1], sizeof(eeprom_font[1])},
-    {"dim_disable", SETTING_TYPE_U8, &eeprom_dim_disable, 0},
+    {"dim_disable", SETTING_TYPE_U8, &eeprom_dim_mode, 0},
+    {"dim_start", SETTING_TYPE_U8, &eeprom_dim_start, 0},
+    {"dim_end", SETTING_TYPE_U8, &eeprom_dim_end, 0},
     {"fahrenheit", SETTING_TYPE_U8, &eeprom_fahrenheit, 0},
     {"12hour", SETTING_TYPE_U8, &eeprom_12hour, 0},
     {"wifi_start", SETTING_TYPE_U8, &eeprom_wifi_start, 0},
@@ -161,6 +166,7 @@ static const nvs_setting_t settings_table[] = {
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
     {"lux_thresh", SETTING_TYPE_BLOB, &eeprom_lux_threshold, sizeof(eeprom_lux_threshold)},
     {"message", SETTING_TYPE_STR, eeprom_message, sizeof(eeprom_message)},
+    {"screen_layout", SETTING_TYPE_BLOB, &eeprom_screen_layout, sizeof(eeprom_screen_layout)},
     {"ha_url", SETTING_TYPE_STR, eeprom_ha_url, sizeof(eeprom_ha_url)},
     {"ha_token", SETTING_TYPE_STR, eeprom_ha_token, sizeof(eeprom_ha_token)},
     {"ha_refresh", SETTING_TYPE_U16, &eeprom_ha_refresh_mins, 0},
@@ -287,6 +293,7 @@ time_t last_time_update = 0;         // Store timestamp of last time sync
 bool settings_updated = false;       // Flag to indicate non-critical settings were updated
 bool weather_has_updated = false;    // Flag to indicate weather data has been updated
 bool ota_update_in_progress = false; // Flag to indicate OTA update is in progress
+bool ota_reinstall_in_progress = false; // Flag to indicate firmware reinstall (not upgrade) is in progress
 bool ota_updating_message = false;
 
 // IP address display on boot
@@ -639,6 +646,12 @@ void startup_read_eeprom(void)
           err = ESP_OK;
         }
       }
+      else if (err == ESP_ERR_NVS_INVALID_LENGTH && s->type == SETTING_TYPE_BLOB && strcmp(s->key, "screen_layout") == 0)
+      {
+        screen_layout_apply_factory_defaults(&eeprom_screen_layout);
+        screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
+        err = ESP_OK;
+      }
 
       if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
       {
@@ -660,6 +673,12 @@ void startup_read_eeprom(void)
     strcpy(my_lat, eeprom_lat);
     strcpy(my_lon, eeprom_lon);
     strcpy(my_timezone, eeprom_timezone);
+    {
+      uint8_t layout_version_before = eeprom_screen_layout.version;
+      screen_layout_ensure_valid();
+      if (layout_version_before != eeprom_screen_layout.version)
+        write_nvs_parameters();
+    }
 
     if (eeprom_board_rev == 1)
     {
@@ -704,7 +723,7 @@ void startup_read_eeprom(void)
                 eeprom_hostname, eeprom_wifi_ssid, eeprom_wifi_start, eeprom_wifi_end,
                 eeprom_lat, eeprom_lon, eeprom_timezone,
                 eeprom_font[0], eeprom_font[1],
-                eeprom_dim_disable, eeprom_fahrenheit, eeprom_12hour,
+                eeprom_dim_mode, eeprom_fahrenheit, eeprom_12hour,
                 eeprom_quiet_scroll, eeprom_quiet_weather,
                 eeprom_show_leading_zero, eeprom_dots_breathe,
                 eeprom_color_filter[0], eeprom_color_filter[1],

@@ -2,6 +2,7 @@
 
 idf_component_register(SRCS 
     "main.c"
+    "f-screen-layout.c"
     "f-wifi.c"
     "f-display.c"
     "f-time.c"
@@ -18,7 +19,8 @@ idf_component_register(SRCS
     "frixos_10.c"
     "frixos_11.c"
     "frixos_12.c"
-    "frixos_14.c"    
+    "frixos_14.c"
+    "frixos_16.c"
     "font-pixelate_10.c"
     "f-membuffer.c"
     "f-json.c"
