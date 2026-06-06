@@ -797,6 +797,9 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_STATUS_CODE:
         break;
 
+    case HTTP_EVENT_ON_HEADERS_COMPLETE:
+    case HTTP_EVENT_ON_STATUS_CODE:
+        break;
     case HTTP_EVENT_ON_DATA:
         if (is_forecast_request) {
             // Process forecast data incrementally
