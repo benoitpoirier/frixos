@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSamplesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSamplesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -98,7 +100,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select_font: 'Select {name} font'
         },
         screen: {
             title: 'Layout',
@@ -584,6 +587,19 @@ async function translate(lang) {
     // Update token tooltips and ARIA labels after language change
     tokenCodesCache = null;
     document.querySelectorAll('.token-code').forEach(token => updateTokenButtonTooltip(token));
+
+    // Update font sample ARIA labels after language change
+    if (!fontSamplesCache) {
+        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSamplesCache.forEach(box => {
+        const nameEl = box.querySelector('.font-sample-name');
+        if (nameEl) {
+            const fontName = nameEl.textContent.trim();
+            const selectFontTemplate = getNestedTranslation(trans, 'common.select_font') || 'Select {name} font';
+            box.setAttribute('aria-label', selectFontTemplate.replace('{name}', fontName));
+        }
+    });
 
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
@@ -4556,6 +4572,38 @@ function setupAdvancedSection() {
                 bindTokenInsert(t, messageInput, () => highlightElement(messageInput));
             });
         }
+
+        // Setup interactive font samples
+        document.querySelectorAll('.font-sample-box').forEach(box => {
+            box.setAttribute('role', 'button');
+            box.setAttribute('tabindex', '0');
+
+            const selectFont = () => {
+                const nameEl = box.querySelector('.font-sample-name');
+                if (!nameEl) return;
+                const fontValue = nameEl.textContent.trim().toLowerCase();
+                const dayFont = el('dayfont');
+                const nightFont = el('nightfont');
+
+                if (dayFont) {
+                    dayFont.value = fontValue;
+                    highlightElement(dayFont);
+                }
+                if (nightFont) {
+                    nightFont.value = fontValue;
+                    highlightElement(nightFont);
+                }
+                highlightElement(box);
+            };
+
+            box.addEventListener('click', selectFont);
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectFont();
+                }
+            });
+        });
     }
 
     // Populate fields if settings are loaded
