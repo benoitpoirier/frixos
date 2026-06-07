@@ -81,9 +81,18 @@
     "ampm_note": "Die AM/PM-Anzeige ist nur bei 12-Stunden-Format sichtbar (unter Einstellungen).",
     "display_schedule": {
       "title": "Anzeigeplan",
-      "description": "Legen Sie fest, was auf dem Display erscheint und wie lange. Die Slots wechseln der Reihe nach. Ein einzelner Zeit-Slot bedeutet, dass die Uhr immer angezeigt wird.",
-      "add_slot": "+ Slot hinzufügen"
+      "description": "Legen Sie fest, was auf der primären Ziffernanzeige erscheint und wie lange. Die Slots wechseln der Reihe nach. Ein einzelner Zeit-Slot bedeutet, dass die Uhr immer angezeigt wird.",
+      "add_slot": "+ Slot hinzufügen",
+      "label_placeholder": "Beschriftung (z. B. Außentemp.)"
     },
+    "display_schedule_aux": {
+      "title": "Anzeigeplan (Aux)",
+      "description": "Legen Sie fest, was auf der Aux-Ziffernanzeige erscheint und wie lange. Die Slots wechseln unabhängig von der primären Anzeige."
+    },
+    "aux_time_font": "Ziffernschrift",
+    "empty_text_label": "(leer)",
+    "palette_text_icon": "Text",
+    "digit_label_width": "Breite (px)",
     "show_leading_zero": "0 für einstellige Stunde anzeigen",
     "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
     "editor_aria": "128×128-Bildschirm-Editor",
@@ -103,15 +112,20 @@
       "weather": "Wetter",
       "moon": "Mond",
       "time": "Ziffernanzeige",
-      "glucose": "Glukose",
+      "digit_label": "Ziffern-Beschriftung",
+      "time_aux": "Ziffernanzeige (Aux)",
+      "digit_label_aux": "Ziffern-Beschriftung (Aux)",
       "ampm": "AM/PM",
       "message": "Laufnachricht",
-      "text": "Text",
+      "text": "Neue Textzeile",
       "text_1": "Text 1",
       "text_2": "Text 2",
       "text_3": "Text 3",
       "text_4": "Text 4",
-      "text_5": "Text 5"
+      "text_5": "Text 5",
+      "text_6": "Text 6",
+      "text_7": "Text 7",
+      "text_8": "Text 8"
     }
   },
   "advanced": {

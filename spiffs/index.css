@@ -338,7 +338,7 @@ body {
 .screen-preview-time { aspect-ratio: 80 / 36; }
 .screen-preview-glucose { aspect-ratio: 70 / 36; }
 .screen-preview-ampm { aspect-ratio: 10 / 20; }
-.screen-preview-message { aspect-ratio: 128 / 8; }
+.screen-preview-message { aspect-ratio: 128 / 9; }
 
 .screen-preview-matrix {
     width: 100%;
@@ -580,6 +580,13 @@ body {
     flex: 0 0 auto;
 }
 
+.schedule-slot-row input.schedule-slot-label {
+    flex: 0 0 auto;
+    width: 22ch;
+    max-width: 22ch;
+    min-width: 0;
+}
+
 .schedule-slot-row button {
     flex: 0 0 auto;
     cursor: pointer;
@@ -649,15 +656,36 @@ body {
     background-image: none !important;
 }
 
+.screen-preview-text-message,
 .screen-preview-text-text,
 .screen-preview-text-text_1,
 .screen-preview-text-text_2,
 .screen-preview-text-text_3,
 .screen-preview-text-text_4,
-.screen-preview-text-text_5 {
+.screen-preview-text-text_5,
+.screen-preview-text-text_6,
+.screen-preview-text-text_7,
+.screen-preview-text-text_8,
+.screen-preview-text-digit_label,
+.screen-preview-text-digit_label_aux {
     font-family: "Segoe UI", Tahoma, sans-serif;
     font-size: 8px;
     text-align: left;
+}
+
+.screen-preview-matrix.screen-preview-message,
+.screen-preview-matrix.screen-preview-text_1,
+.screen-preview-matrix.screen-preview-text_2,
+.screen-preview-matrix.screen-preview-text_3,
+.screen-preview-matrix.screen-preview-text_4,
+.screen-preview-matrix.screen-preview-text_5,
+.screen-preview-matrix.screen-preview-text_6,
+.screen-preview-matrix.screen-preview-text_7,
+.screen-preview-matrix.screen-preview-text_8,
+.screen-preview-matrix.screen-preview-digit_label,
+.screen-preview-matrix.screen-preview-digit_label_aux {
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 .screen-preview.screen-preview-palette-static-label {

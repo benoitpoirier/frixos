@@ -74,9 +74,18 @@
     "ampm_note": "L'indicateur AM/PM n'est visible qu'avec le format 12 heures (dans Paramètres).",
     "display_schedule": {
       "title": "Programme d'affichage",
-      "description": "Définissez ce qui apparaît sur l'écran et pendant combien de temps. Les créneaux défilent dans l'ordre. Un seul créneau Heure signifie que l'horloge est toujours affichée.",
-      "add_slot": "+ Ajouter un créneau"
+      "description": "Définissez ce qui apparaît sur l'affichage numérique principal et pendant combien de temps. Les créneaux défilent dans l'ordre. Un seul créneau Heure signifie que l'horloge est toujours affichée.",
+      "add_slot": "+ Ajouter un créneau",
+      "label_placeholder": "libellé (p. ex. Temp. ext.)"
     },
+    "display_schedule_aux": {
+      "title": "Programme d'affichage (Aux)",
+      "description": "Définissez ce qui apparaît sur l'affichage numérique aux et pendant combien de temps. Les créneaux défilent indépendamment de l'affichage principal."
+    },
+    "aux_time_font": "Police des chiffres",
+    "empty_text_label": "(vide)",
+    "palette_text_icon": "Texte",
+    "digit_label_width": "Largeur (px)",
     "show_leading_zero": "Afficher 0 pour les heures à un chiffre",
     "disable_dots_breathe": "Désactiver les points d'heure pulsants",
     "editor_aria": "Éditeur d'écran 128×128",
@@ -96,15 +105,20 @@
       "weather": "Météo",
       "moon": "Lune",
       "time": "Affichage numérique",
-      "glucose": "Glucose",
+      "digit_label": "Étiquette numérique",
+      "time_aux": "Affichage numérique (Aux)",
+      "digit_label_aux": "Étiquette numérique (Aux)",
       "ampm": "AM/PM",
       "message": "Message défilant",
-      "text": "Texte",
+      "text": "Nouvelle ligne de texte",
       "text_1": "Texte 1",
       "text_2": "Texte 2",
       "text_3": "Texte 3",
       "text_4": "Texte 4",
-      "text_5": "Texte 5"
+      "text_5": "Texte 5",
+      "text_6": "Texte 6",
+      "text_7": "Texte 7",
+      "text_8": "Texte 8"
     }
   },
   "advanced": {

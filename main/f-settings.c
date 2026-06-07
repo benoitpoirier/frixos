@@ -97,6 +97,7 @@
  * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
  * - p57 = eeprom_sec_weather (Alternate weather temperature display duration in seconds)
  * - p58 = eeprom_disp_sched (Display schedule JSON)
+ * - p59 = eeprom_disp_sched_aux (Aux digit display schedule JSON)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
  */
@@ -106,9 +107,10 @@ static const char *TAG = "f-settings";
 
 /* ---- Display schedule helpers ---- */
 
-void parse_display_schedule(const char *json)
+static void parse_display_schedule_into(display_slot_t *out_slots, int *out_count,
+                                        const char *json, const char *log_label)
 {
-    display_schedule_count = 0;
+    *out_count = 0;
     if (!json || json[0] == '\0') return;
 
     cJSON *arr = cJSON_Parse(json);
@@ -130,7 +132,7 @@ void parse_display_schedule(const char *json)
         int dur = d->valueint;
         if (dur <= 0 || dur > 3600) continue;
 
-        display_slot_t *s = &display_schedule[display_schedule_count];
+        display_slot_t *s = &out_slots[*out_count];
         s->type      = (slot_type_t)type;
         s->duration  = (uint16_t)dur;
         s->entity[0] = '\0';
@@ -160,10 +162,20 @@ void parse_display_schedule(const char *json)
             strncpy(s->name, n->valuestring, sizeof(s->name) - 1);
             s->name[sizeof(s->name) - 1] = '\0';
         }
-        display_schedule_count++;
+        (*out_count)++;
     }
     cJSON_Delete(arr);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display schedule: %d slots", display_schedule_count);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%s: %d slots", log_label, *out_count);
+}
+
+void parse_display_schedule(const char *json)
+{
+    parse_display_schedule_into(display_schedule, &display_schedule_count, json, "Display schedule");
+}
+
+void parse_display_schedule_aux(const char *json)
+{
+    parse_display_schedule_into(display_schedule_aux, &display_schedule_aux_count, json, "Aux display schedule");
 }
 
 void migrate_schedule_from_legacy(void)
@@ -655,11 +667,12 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "integrations") == 0)
         {
-            // p25-p33, p44, p45, p48, p49, p51-p54, p57, p58
+            // p25-p33, p44, p45, p48, p49, p51-p54, p57-p59
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
-                    (1ULL << 53) | (1ULL << 54) | (1ULL << 57) | (1ULL << 58);
+                    (1ULL << 53) | (1ULL << 54) | (1ULL << 57) | (1ULL << 58) |
+                    (1ULL << 59);
         }
     }
 
@@ -796,6 +809,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
     if (mask & (1ULL << 57)) cJSON_AddNumberToObject(root, "p57", eeprom_sec_weather);
     if (mask & (1ULL << 58)) cJSON_AddStringToObject(root, "p58", eeprom_disp_sched);
+    if (mask & (1ULL << 59)) cJSON_AddStringToObject(root, "p59", eeprom_disp_sched_aux);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
@@ -1233,13 +1247,19 @@ static const char *screen_elem_id_str[SCREEN_ELEM_COUNT] = {
     "text_3",
     "text_4",
     "text_5",
+    "text_6",
+    "text_7",
+    "text_8",
     "ampm",
-    "glucose",
+    "time_aux",
+    "digit_label",
+    "digit_label_aux",
 };
 
 static int screen_elem_from_id(const char *id)
 {
     if (!id) return -1;
+    if (strcmp(id, "glucose") == 0) return SCREEN_ELEM_TIME_AUX;
     for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
     {
         if (strcmp(id, screen_elem_id_str[i]) == 0) return i;
@@ -1294,7 +1314,7 @@ static void screen_widget_to_json(cJSON *obj, const char *id, const screen_widge
         cJSON_AddStringToObject(options, "color", color_hex);
         screen_color_to_hex(color_hex, sizeof(color_hex), w->bg_r, w->bg_g, w->bg_b);
         cJSON_AddStringToObject(options, "bg_color", color_hex);
-        if (screen_elem_is_static_text(screen_elem_from_id(id)))
+        if (screen_elem_has_text_layout(screen_elem_from_id(id)))
         {
             cJSON_AddNumberToObject(options, "width", w->width);
             cJSON_AddNumberToObject(options, "align", w->align <= SCREEN_MSG_ALIGN_RIGHT ? w->align : SCREEN_MSG_ALIGN_LEFT);
@@ -1393,7 +1413,7 @@ static esp_err_t parse_screen_profile(const cJSON *profile_obj, screen_layout_pr
                     }
                 }
 
-                if (screen_elem_is_static_text((screen_element_id_t)elem))
+                if (screen_elem_has_text_layout((screen_element_id_t)elem))
                 {
                     const cJSON *width = cJSON_GetObjectItem(options, "width");
                     if (cJSON_IsNumber(width))
@@ -1428,6 +1448,20 @@ static esp_err_t parse_screen_profile(const cJSON *profile_obj, screen_layout_pr
                 out_profile->static_text[i][SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
             }
         }
+
+        const cJSON *digit_label = cJSON_GetObjectItem(static_texts, "digit_label");
+        if (cJSON_IsString(digit_label))
+        {
+            strncpy(out_profile->digit_label_text, digit_label->valuestring, SCREEN_STATIC_TEXT_LENGTH - 1);
+            out_profile->digit_label_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
+        }
+
+        const cJSON *digit_label_aux = cJSON_GetObjectItem(static_texts, "digit_label_aux");
+        if (cJSON_IsString(digit_label_aux))
+        {
+            strncpy(out_profile->digit_label_aux_text, digit_label_aux->valuestring, SCREEN_STATIC_TEXT_LENGTH - 1);
+            out_profile->digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
+        }
     }
 
     return ESP_OK;
@@ -1440,6 +1474,8 @@ esp_err_t screen_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "scroll_delay", eeprom_screen_layout.scroll_delay);
     cJSON_AddStringToObject(root, "day_font", eeprom_font[0]);
     cJSON_AddStringToObject(root, "night_font", eeprom_font[1]);
+    cJSON_AddStringToObject(root, "day_aux_font", eeprom_aux_font[0]);
+    cJSON_AddStringToObject(root, "night_aux_font", eeprom_aux_font[1]);
     cJSON_AddNumberToObject(root, "day_color_filter", eeprom_color_filter[0]);
     cJSON_AddNumberToObject(root, "night_color_filter", eeprom_color_filter[1]);
     cJSON_AddNumberToObject(root, "w", LCD_H_RES);
@@ -1460,6 +1496,10 @@ esp_err_t screen_get_handler(httpd_req_t *req)
         for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
             cJSON_AddStringToObject(static_texts, screen_elem_id_str[SCREEN_ELEM_TEXT_1 + i],
                                     eeprom_screen_layout.profile[pi].static_text[i]);
+        cJSON_AddStringToObject(static_texts, "digit_label",
+                                eeprom_screen_layout.profile[pi].digit_label_text);
+        cJSON_AddStringToObject(static_texts, "digit_label_aux",
+                                eeprom_screen_layout.profile[pi].digit_label_aux_text);
         cJSON_AddItemToObject(p, "static_texts", static_texts);
 
         for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
@@ -1583,6 +1623,20 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     {
         strncpy(eeprom_font[1], night_font->valuestring, sizeof(eeprom_font[1]) - 1);
         eeprom_font[1][sizeof(eeprom_font[1]) - 1] = '\0';
+    }
+
+    const cJSON *day_aux_font = cJSON_GetObjectItem(root, "day_aux_font");
+    if (cJSON_IsString(day_aux_font))
+    {
+        strncpy(eeprom_aux_font[0], day_aux_font->valuestring, sizeof(eeprom_aux_font[0]) - 1);
+        eeprom_aux_font[0][sizeof(eeprom_aux_font[0]) - 1] = '\0';
+    }
+
+    const cJSON *night_aux_font = cJSON_GetObjectItem(root, "night_aux_font");
+    if (cJSON_IsString(night_aux_font))
+    {
+        strncpy(eeprom_aux_font[1], night_aux_font->valuestring, sizeof(eeprom_aux_font[1]) - 1);
+        eeprom_aux_font[1][sizeof(eeprom_aux_font[1]) - 1] = '\0';
     }
 
     const cJSON *day_color_filter = cJSON_GetObjectItem(root, "day_color_filter");
@@ -2348,6 +2402,20 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             parse_display_schedule(eeprom_disp_sched);
             // Re-register any new HA entities from the schedule via the consolidated
             // parse_integrations() call below.
+            integration_settings_changed = true;
+        }
+    }
+
+    // p59: aux digit display schedule JSON
+    if (cJSON_HasObjectItem(root, "p59"))
+    {
+        cJSON *p59 = cJSON_GetObjectItem(root, "p59");
+        const char *sched_json = cJSON_IsString(p59) ? p59->valuestring : NULL;
+        if (sched_json && strlen(sched_json) < sizeof(eeprom_disp_sched_aux))
+        {
+            strncpy(eeprom_disp_sched_aux, sched_json, sizeof(eeprom_disp_sched_aux) - 1);
+            eeprom_disp_sched_aux[sizeof(eeprom_disp_sched_aux) - 1] = '\0';
+            parse_display_schedule_aux(eeprom_disp_sched_aux);
             integration_settings_changed = true;
         }
     }

@@ -94,6 +94,7 @@ char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456
 char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
+char eeprom_aux_font[2][12] = {"bold", "bold"};                    // [0] = day aux digit font, [1] = night aux
 float eeprom_lux_sensitivity = 6.0;
 float eeprom_lux_threshold = 16.0;
 uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
@@ -185,6 +186,7 @@ static const nvs_setting_t settings_table[] = {
     {"sec_cgm", SETTING_TYPE_U8, &eeprom_sec_cgm, 0},
     {"sec_weather", SETTING_TYPE_U8, &eeprom_sec_weather, 0},
     {"disp_sched", SETTING_TYPE_STR, eeprom_disp_sched, sizeof(eeprom_disp_sched)},
+    {"disp_sched_aux", SETTING_TYPE_STR, eeprom_disp_sched_aux, sizeof(eeprom_disp_sched_aux)},
     {"cgm_unit", SETTING_TYPE_U8, &eeprom_glucose_unit, 0},
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
@@ -275,10 +277,13 @@ uint8_t eeprom_sec_time = 25;            // Alternate time display duration (0-1
 uint8_t eeprom_sec_cgm = 5;              // Alternate CGM display duration (0-120 seconds) — legacy, used for migration
 uint8_t eeprom_sec_weather = 0;          // Alternate weather temperature display duration — legacy, used for migration
 char eeprom_disp_sched[512] = {0};       // Display schedule JSON (p58)
+char eeprom_disp_sched_aux[512] = {0};   // Aux digit display schedule JSON (p59)
 
 /* Display schedule parsed from eeprom_disp_sched */
 display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
 int            display_schedule_count = 0;
+display_slot_t display_schedule_aux[MAX_DISPLAY_SLOTS];
+int            display_schedule_aux_count = 0;
 char eeprom_libre_patient_id[64] = {0};
 char eeprom_libre_token[512] = {0};
 char libre_account_id[64] = {0};
@@ -711,11 +716,16 @@ void startup_read_eeprom(void)
     else
         migrate_schedule_from_legacy();
 
+    if (eeprom_disp_sched_aux[0] != '\0')
+        parse_display_schedule_aux(eeprom_disp_sched_aux);
+    else
+        display_schedule_aux_count = 0;
+
     // Close NVS
     nvs_close(nvs_handle);
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HTTPD_MAX_REQ_HDR_LEN=%u",
-                (unsigned)HTTPD_MAX_REQ_HDR_LEN);
+                (unsigned)CONFIG_HTTPD_MAX_REQ_HDR_LEN);
 
     // 5. Log final parameters
     ESP_LOG_WEB(ESP_LOG_INFO, TAG,

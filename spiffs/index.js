@@ -1486,6 +1486,7 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds — legacy, migration only)
  * - p57 = eeprom_sec_weather (Alternate weather temperature display duration — legacy, migration only)
  * - p58 = eeprom_disp_sched (Display schedule JSON)
+ * - p59 = eeprom_disp_sched_aux (Aux digit display schedule JSON)
  * - p51 = eeprom_glucose_high (High glucose threshold in mg/dL)
  * - p52 = eeprom_glucose_low (Low glucose threshold in mg/dL)
  * - p53 = cgm_unit (Glucose display unit: 0=mg/dL, 1=mmol/L)
@@ -2753,13 +2754,33 @@ function setupRestartSection() {
 const SCREEN_SIZE = 128;
 const SCREEN_DRAG_THRESHOLD = 3;
 const SCREEN_PREVIEW_MESSAGE = 'Customize your frixos projection clock';
-const SCREEN_MESSAGE_FONT_HEIGHTS = {
+// LVGL label object line heights on device (frixos_* fonts).
+const SCREEN_MESSAGE_FONT_LINE_HEIGHTS = {
+    0: 12,
+    1: 16,
+    2: 16,
+    3: 17,
+    4: 21
+};
+// Visible label/bg height on device (line box minus unused rows above/below glyphs).
+const SCREEN_LABEL_VISIBLE_HEIGHTS = {
+    0: 9,
+    1: 13,
+    2: 13,
+    3: 14,
+    4: 18
+};
+// Stored layout Y is above the visible label; match on-screen bg top inset.
+const SCREEN_LABEL_LAYOUT_TRIM = 3;
+// Nominal point sizes for preview glyph scale.
+const SCREEN_MESSAGE_FONT_SIZES = {
     0: 8,
     1: 10,
     2: 12,
     3: 14,
     4: 16
 };
+const SCREEN_MESSAGE_FONT_HEIGHTS = SCREEN_MESSAGE_FONT_LINE_HEIGHTS;
 const SCREEN_MESSAGE_FONT_OPTIONS = [
     { v: 0, t: '8pt' },
     { v: 1, t: '10pt' },
@@ -2797,8 +2818,15 @@ const SCREEN_DEFAULT_STATIC_TEXTS = {
     text_2: '[pressure]',
     text_3: 'Wind [wind]',
     text_4: 'Gust [gust]',
-    text_5: 'Rain [precip]'
+    text_5: 'Rain [precip]',
+    text_6: '',
+    text_7: '',
+    text_8: '',
+    digit_label: '',
+    digit_label_aux: ''
 };
+const SCREEN_TEXT_SLOT_MAX = 8;
+const SCREEN_PALETTE_LABEL_MAX = 24;
 const SCREEN_TOKEN_CODES = [
     '[device]', '[greeting]', '[day]', '[date]', '[mon]', '[temp]', '[hum]', '[high]', '[low]',
     '[rise]', '[set]', '[wind]', '[gust]', '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]',
@@ -3227,9 +3255,20 @@ function resolveTimeFontPreviewUrl(font) {
     return `${font}.jpg`;
 }
 
+function getScreenAuxFont(mode) {
+    if (!window.screenLayout) return 'bold';
+    return mode === 'night'
+        ? (window.screenLayout.night_aux_font || 'bold')
+        : (window.screenLayout.day_aux_font || 'bold');
+}
+
 function getPreviewImageUrl(def, inMatrix) {
     if (def.id === 'time') {
         const font = inMatrix ? getScreenTimeFont(window.screenEditor.mode) : 'bold';
+        return resolveTimeFontPreviewUrl(font);
+    }
+    if (def.id === 'time_aux') {
+        const font = inMatrix ? getScreenAuxFont(window.screenEditor.mode) : 'bold';
         return resolveTimeFontPreviewUrl(font);
     }
     const item = SCREEN_THEME_ASSETS[def.id];
@@ -3246,25 +3285,60 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'default-weather.jpg' },
     { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg' },
     { id: 'time', label: 'Digit Display', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'glucose', label: 'Glucose', w: 70, h: 36, img: 'glucose.jpg', paletteFitFullImage: true },
+    { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label },
+    { id: 'time_aux', label: 'Digit Display (Aux)', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
+    { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux },
     { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
     { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
-    { id: 'text_1', label: 'Text 1', w: 64, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
-    { id: 'text_2', label: 'Text 2', w: 64, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
-    { id: 'text_3', label: 'Text 3', w: 64, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
-    { id: 'text_4', label: 'Text 4', w: 64, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_4 },
-    { id: 'text_5', label: 'Text 5', w: 64, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_5 }
+    { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
+    { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
+    { id: 'text_3', label: 'Text 3', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
+    { id: 'text_4', label: 'Text 4', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_4 },
+    { id: 'text_5', label: 'Text 5', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_5 },
+    { id: 'text_6', label: 'Text 6', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_6 },
+    { id: 'text_7', label: 'Text 7', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_7 },
+    { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 }
 ];
 
-const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5'];
+const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
 
 const SCREEN_PALETTE_TEXT_DEF = {
     id: 'text',
-    label: 'Text',
-    w: 64,
+    label: 'New Text Line',
+    w: 80,
     h: 8,
     dynamicHeight: true
 };
+
+function getPaletteNewTextIconLabel() {
+    return getScreenTranslation('screen.palette_text_icon', 'Text');
+}
+
+function truncatePaletteLabel(text, maxLen = SCREEN_PALETTE_LABEL_MAX) {
+    const s = (text || '').trim();
+    if (!s) return '';
+    return s.length > maxLen ? s.slice(0, maxLen) + '\u2026' : s;
+}
+
+function getStaticTextContent(profile, id) {
+    if (!profile) return '';
+    if (profile.static_texts && profile.static_texts[id] !== undefined) {
+        return profile.static_texts[id];
+    }
+    return SCREEN_DEFAULT_STATIC_TEXTS[id] || '';
+}
+
+function getTextPaletteLabel(profile, id) {
+    const emptyLabel = getScreenTranslation('screen.empty_text_label', '(empty)');
+    const content = getStaticTextContent(profile, id).trim();
+    return truncatePaletteLabel(content) || emptyLabel;
+}
+
+function getScreenPaletteItemLabel(def, profile) {
+    if (def.id === 'text') return getScreenElementLabel('text');
+    if (isScreenStaticTextElement(def.id) && profile) return getTextPaletteLabel(profile, def.id);
+    return getScreenElementLabel(def.id);
+}
 
 function getNextTextSlot(profile) {
     if (!profile || !profile.elements) return SCREEN_TEXT_SLOT_IDS[0];
@@ -3276,23 +3350,48 @@ function getNextTextSlot(profile) {
 }
 
 function getScreenPaletteDefs() {
-    return [
-        ...SCREEN_ELEMENT_DEFS.filter(d => !isScreenStaticTextElement(d.id)),
-        SCREEN_PALETTE_TEXT_DEF
-    ];
+    const profile = getProfileObj(window.screenEditor.mode);
+    const base = SCREEN_ELEMENT_DEFS.filter(d => !isScreenStaticTextElement(d.id));
+    const enabledTextItems = [];
+    if (profile) {
+        SCREEN_TEXT_SLOT_IDS.forEach(id => {
+            const elem = profile.elements.find(e => e.id === id);
+            if (elem && elem.enabled) {
+                const def = findElementDef(id);
+                if (def) enabledTextItems.push({ ...def });
+            }
+        });
+    }
+    const items = [...base, ...enabledTextItems];
+    if (getNextTextSlot(profile) !== null) {
+        items.push(SCREEN_PALETTE_TEXT_DEF);
+    }
+    return items;
 }
 
 function resolvePaletteElementId(paletteId, profile) {
-    if (paletteId !== 'text') return paletteId;
-    return getNextTextSlot(profile);
+    if (paletteId === 'text') return getNextTextSlot(profile);
+    return paletteId;
+}
+
+function isScreenDigitLabelElement(id) {
+    return id === 'digit_label' || id === 'digit_label_aux';
 }
 
 function isScreenTextElement(id) {
-    return id === 'message' || /^text_[1-5]$/.test(id);
+    return id === 'message' || /^text_[1-8]$/.test(id) || isScreenDigitLabelElement(id);
 }
 
 function isScreenStaticTextElement(id) {
-    return /^text_[1-5]$/.test(id);
+    return /^text_[1-8]$/.test(id);
+}
+
+function isScreenClippedTextElement(id) {
+    return isScreenStaticTextElement(id) || isScreenDigitLabelElement(id);
+}
+
+function getDigitLabelTextKey(id) {
+    return id;
 }
 
 function ensureScreenTextOptions(element) {
@@ -3301,7 +3400,11 @@ function ensureScreenTextOptions(element) {
     if (!element.options.color) element.options.color = '#ffffff';
     if (!element.options.bg_color) element.options.bg_color = '#000000';
     if (isScreenStaticTextElement(element.id)) {
-        if (element.options.width === undefined) element.options.width = 0;
+        if (element.options.width === undefined) element.options.width = 80;
+        if (element.options.align === undefined) element.options.align = 0;
+    }
+    if (isScreenDigitLabelElement(element.id)) {
+        if (element.options.width === undefined) element.options.width = 80;
         if (element.options.align === undefined) element.options.align = 0;
     }
 }
@@ -3314,18 +3417,20 @@ function makeDefaultScreenProfile() {
         { id: 'weather', enabled: 1, x: 54, y: 24, z: 3 },
         { id: 'moon', enabled: 1, x: 87, y: 29, z: 3 },
         { id: 'time', enabled: 1, x: 22, y: 47, z: 1 },
+        { id: 'digit_label', enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } },
         { id: 'ampm', enabled: 1, x: 101, y: 54, z: 2 },
-        { id: 'glucose', enabled: 0, x: 22, y: 47, z: 1 },
+        { id: 'time_aux', enabled: 0, x: 22, y: 47, z: 1 },
+        { id: 'digit_label_aux', enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } },
         { id: 'message', enabled: 1, x: 0, y: 86, z: 0, options: { font: 0, color: '#ffffff', bg_color: '#000000' } }
     ];
-    ['text_1', 'text_2', 'text_3', 'text_4', 'text_5'].forEach((id, index) => {
+    SCREEN_TEXT_SLOT_IDS.forEach((id, index) => {
         elements.push({
             id,
             enabled: 0,
             x: 45,
             y: 90,
             z: Math.min(4, 1 + index),
-            options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 0, align: 0 }
+            options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 }
         });
     });
     return {
@@ -3335,13 +3440,15 @@ function makeDefaultScreenProfile() {
     };
 }
 
-const SCREEN_LAYOUT_VERSION = 7;
+const SCREEN_LAYOUT_VERSION = 9;
 
 const SCREEN_DEFAULT_LAYOUT = {
     version: SCREEN_LAYOUT_VERSION,
     scroll_delay: 65,
     day_font: 'bold',
     night_font: 'bold',
+    day_aux_font: 'bold',
+    night_aux_font: 'bold',
     day_color_filter: 0,
     night_color_filter: 0,
     w: 128,
@@ -3383,20 +3490,43 @@ function evenPx(value) {
     return rounded % 2 === 0 ? rounded : rounded + 1;
 }
 
+function getScreenLabelTopTrim(id) {
+    return isScreenTextElement(id) ? SCREEN_LABEL_LAYOUT_TRIM : 0;
+}
+
+function layoutYToVisualY(layoutY, id) {
+    return layoutY + getScreenLabelTopTrim(id);
+}
+
+function visualYToLayoutY(visualY, id) {
+    return Math.max(0, visualY - getScreenLabelTopTrim(id));
+}
+
+function getScreenLabelLineHeight(fontIndex) {
+    return SCREEN_MESSAGE_FONT_LINE_HEIGHTS[fontIndex] || 12;
+}
+
+function getScreenLabelBoxHeight(fontIndex) {
+    if (SCREEN_LABEL_VISIBLE_HEIGHTS[fontIndex] !== undefined) {
+        return SCREEN_LABEL_VISIBLE_HEIGHTS[fontIndex];
+    }
+    return Math.max(1, getScreenLabelLineHeight(fontIndex) - SCREEN_LABEL_LAYOUT_TRIM);
+}
+
 function getScreenElementSize(def, elementState) {
     if (!def) return { w: 0, h: 0 };
     let w;
     let h;
     if (isScreenTextElement(def.id)) {
         const font = elementState && elementState.options && elementState.options.font !== undefined ? elementState.options.font : 0;
-        w = isScreenStaticTextElement(def.id) && elementState && elementState.options && elementState.options.width > 0
+        w = isScreenClippedTextElement(def.id) && elementState && elementState.options && elementState.options.width > 0
             ? elementState.options.width
-            : (isScreenStaticTextElement(def.id) ? def.w : 128);
-        h = SCREEN_MESSAGE_FONT_HEIGHTS[font] || 8;
-    } else {
-        w = def.w;
-        h = def.h;
+            : (isScreenClippedTextElement(def.id) ? def.w : 128);
+        h = getScreenLabelBoxHeight(font);
+        return { w: evenPx(w), h };
     }
+    w = def.w;
+    h = def.h;
     return { w: evenPx(w), h: evenPx(h) };
 }
 
@@ -3418,6 +3548,8 @@ function ensureScreenLayoutMeta(layout) {
     if (!layout) return;
     if (!layout.day_font) layout.day_font = (window.settings && window.settings.p04) || 'bold';
     if (!layout.night_font) layout.night_font = (window.settings && window.settings.p05) || 'bold';
+    if (!layout.day_aux_font) layout.day_aux_font = layout.day_font || 'bold';
+    if (!layout.night_aux_font) layout.night_aux_font = layout.night_font || 'bold';
     if (layout.day_color_filter === undefined) layout.day_color_filter = (window.settings && window.settings.p10) || 0;
     if (layout.night_color_filter === undefined) layout.night_color_filter = (window.settings && window.settings.p11) || 0;
 }
@@ -3455,6 +3587,13 @@ function prepareScreenLayout(layout) {
     if (!layout.scroll_delay) {
         layout.scroll_delay = (window.settings && window.settings.p14) || 65;
     }
+    ['day', 'night'].forEach(mode => {
+        const profile = layout.profiles[mode];
+        if (!profile || !Array.isArray(profile.elements)) return;
+        profile.elements.forEach(elem => {
+            if (elem && elem.id === 'glucose') elem.id = 'time_aux';
+        });
+    });
     ensureScreenLayoutMeta(layout);
     ['day', 'night'].forEach(mode => {
         const profile = layout.profiles[mode];
@@ -3468,15 +3607,19 @@ function ensureElementInProfile(profile, id) {
     if (!profile.elements) profile.elements = [];
     let e = profile.elements.find(x => x.id === id);
     if (!e) {
-        if (id === 'glucose') {
+        if (id === 'time_aux') {
             e = { id, enabled: 0, x: 22, y: 47, z: 1 };
+        } else if (id === 'digit_label') {
+            e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
+        } else if (id === 'digit_label_aux') {
+            e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
         } else {
             e = { id, enabled: 1, x: 0, y: 0, z: 0 };
         }
         profile.elements.push(e);
     }
     if (e.enabled === undefined) {
-        if (id === 'glucose') e.enabled = 0;
+        if (id === 'time_aux' || id === 'digit_label' || id === 'digit_label_aux') e.enabled = 0;
         else e.enabled = 1;
     }
     if (id === 'ampm') e.enabled = 1;
@@ -3532,6 +3675,7 @@ function setScreenMode(mode) {
     updateScreenModeButtons();
     renderScreenCanvas();
     renderScreenOptions();
+    renderScreenPalette();
     updateScreenStatusLine();
 }
 
@@ -3681,35 +3825,39 @@ function createScreenPreview(def, inMatrix, elementState, matrixScale) {
 
     const text = document.createElement('div');
     text.className = 'screen-preview-text screen-preview-text-' + def.id;
-    if (!inMatrix && def.id === 'text') {
+    if (!inMatrix && (def.id === 'text' || (isScreenStaticTextElement(def.id) && !inMatrix && !elementState))) {
         preview.classList.add('screen-preview-palette-static-label');
         text.classList.add('screen-preview-text-palette-static');
-        text.textContent = getScreenElementLabel('text');
-    } else if (!inMatrix && isScreenStaticTextElement(def.id)) {
-        preview.classList.add('screen-preview-palette-static-label');
-        text.classList.add('screen-preview-text-palette-static');
-        const label = document.createElement('span');
-        label.className = 'screen-preview-text-word';
-        label.textContent = 'Text';
-        const digit = document.createElement('span');
-        digit.className = 'screen-preview-text-digit';
-        digit.textContent = def.id.replace('text_', '');
-        text.appendChild(label);
-        text.appendChild(digit);
+        text.textContent = getPaletteNewTextIconLabel();
     } else {
         text.textContent = def.text || def.label;
         if (isScreenTextElement(def.id)) {
             const font = elementState && elementState.options && elementState.options.font !== undefined ? elementState.options.font : 0;
-            const pt = SCREEN_MESSAGE_FONT_HEIGHTS[font] || 8;
+            const pt = SCREEN_MESSAGE_FONT_SIZES[font] || 8;
             const previewScale = inMatrix ? (matrixScale || getScreenScale()) : 1;
             text.style.fontSize = `${pt * previewScale}px`;
+            text.style.lineHeight = '1';
+            if (inMatrix) {
+                preview.style.alignItems = 'flex-start';
+                const align = elementState && elementState.options ? elementState.options.align : 0;
+                if (align === 1) {
+                    text.style.textAlign = 'center';
+                    preview.style.justifyContent = 'center';
+                } else if (align === 2) {
+                    text.style.textAlign = 'right';
+                    preview.style.justifyContent = 'flex-end';
+                } else {
+                    text.style.textAlign = 'left';
+                    preview.style.justifyContent = 'flex-start';
+                }
+            }
             if (elementState && elementState.options) {
                 if (elementState.options.color) text.style.color = elementState.options.color;
                 if (elementState.options.bg_color) {
                     preview.style.backgroundColor = elementState.options.bg_color;
                 }
             }
-            if (isScreenStaticTextElement(def.id)) {
+            if (isScreenStaticTextElement(def.id) || isScreenDigitLabelElement(def.id)) {
                 const profile = getProfileObj(window.screenEditor.mode);
                 const staticText = profile && profile.static_texts ? profile.static_texts[def.id] : def.text;
                 text.textContent = staticText || def.text || def.label;
@@ -3733,7 +3881,7 @@ function renderScreenPalette() {
         item.setAttribute('data-id', def.id);
         item.setAttribute('role', 'button');
 
-        const slotId = def.id === 'text' && profile ? resolvePaletteElementId(def.id, profile) : def.id;
+        const slotId = def.id === 'text' ? resolvePaletteElementId(def.id, profile) : def.id;
         const unavailable = def.id === 'text' && !slotId;
         if (unavailable) {
             item.classList.add('palette-item-disabled');
@@ -3749,7 +3897,7 @@ function renderScreenPalette() {
         swatch.appendChild(palettePreview);
 
         const label = document.createElement('div');
-        label.textContent = getScreenElementLabel(def.id);
+        label.textContent = getScreenPaletteItemLabel(def, profile);
 
         item.appendChild(swatch);
         item.appendChild(label);
@@ -3786,7 +3934,7 @@ async function fetchScreenLayout() {
     try {
         await refreshScreenLayoutSelect();
         const [settingsResp, response] = await Promise.all([
-            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58'),
+            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58,p59'),
             fetch('/api/screen')
         ]);
         if (settingsResp.ok) {
@@ -3805,6 +3953,7 @@ async function fetchScreenLayout() {
         ensureScreenProfileShape(window.screenLayout.profiles.night);
         renderScreenCanvas();
         renderScreenOptions();
+        renderScreenPalette();
     } catch (error) {
         console.error('Error loading screen layout:', error);
         showStatus(getMessage('error_loading_settings'), 'error');
@@ -3815,14 +3964,21 @@ async function saveScreenTimeDisplaySettings() {
     const leading = el('screen_show_leading_zero');
     const dots = el('screen_dots_breathe');
     const scheduleList = el('display-schedule-list');
+    const auxScheduleList = el('display-schedule-aux-list');
 
     const formData = {};
     if (leading) formData.p24 = leading.checked ? 1 : 0;
     if (dots) formData.p50 = dots.checked ? 1 : 0;
     if (scheduleList) {
-        const newSched = serializeDisplaySchedule();
+        const newSched = serializeDisplaySchedule('display-schedule-list');
         if (newSched !== (window.settings.p58 || '')) {
             formData.p58 = newSched;
+        }
+    }
+    if (auxScheduleList) {
+        const newAuxSched = serializeDisplaySchedule('display-schedule-aux-list');
+        if (newAuxSched !== (window.settings.p59 || '')) {
+            formData.p59 = newAuxSched;
         }
     }
 
@@ -3908,6 +4064,7 @@ function applyScreenLayoutFromData(data) {
     window.screenEditor.selectedId = null;
     renderScreenCanvas();
     renderScreenOptions();
+    renderScreenPalette();
     updateScreenStatusLine();
 }
 
@@ -3982,6 +4139,7 @@ async function restoreScreenDefaults() {
     window.screenEditor.selectedId = null;
     renderScreenCanvas();
     renderScreenOptions();
+    renderScreenPalette();
     await saveScreenLayout();
 }
 
@@ -4025,8 +4183,9 @@ function appendScreenGuides(canvas, scale) {
     if (!elem || !def) return;
 
     const size = getScreenElementSize(def, elem);
+    const visualY = layoutYToVisualY(elem.y || 0, selectedId);
     canvas.appendChild(createScreenGuideLine('v', (elem.x + size.w / 2) * scale, 'selection'));
-    canvas.appendChild(createScreenGuideLine('h', (elem.y + size.h / 2) * scale, 'selection'));
+    canvas.appendChild(createScreenGuideLine('h', (visualY + size.h / 2) * scale, 'selection'));
 }
 
 function renderScreenCanvas() {
@@ -4054,8 +4213,9 @@ function renderScreenCanvas() {
         const box = document.createElement('div');
         box.className = 'screen-element' + (window.screenEditor.selectedId === e.id ? ' selected' : '');
         box.setAttribute('data-id', e.id);
+        const visualY = layoutYToVisualY(e.y || 0, e.id);
         box.style.left = `${(e.x || 0) * scale}px`;
-        box.style.top = `${(e.y || 0) * scale}px`;
+        box.style.top = `${visualY * scale}px`;
         box.style.width = `${size.w * scale}px`;
         box.style.height = `${size.h * scale}px`;
         const layer = getElementLayer(e);
@@ -4079,7 +4239,7 @@ function renderScreenCanvas() {
     updateScreenStatusLine();
 }
 
-async function appendScreenFontSamples(container, selectedFont) {
+async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
     await ensureScreenSpiffsFiles();
     const wrap = document.createElement('div');
     wrap.className = 'screen-font-samples';
@@ -4103,8 +4263,15 @@ async function appendScreenFontSamples(container, selectedFont) {
         box.appendChild(createFontSamplePreview(font));
         box.addEventListener('click', () => {
             const mode = window.screenEditor.mode;
-            if (mode === 'night') window.screenLayout.night_font = font;
-            else window.screenLayout.day_font = font;
+            if (fontLayoutKey === 'night_aux_font' || fontLayoutKey === 'day_aux_font') {
+                window.screenLayout[fontLayoutKey] = font;
+            } else if (fontLayoutKey === 'night_font' || fontLayoutKey === 'day_font') {
+                window.screenLayout[fontLayoutKey] = font;
+            } else if (mode === 'night') {
+                window.screenLayout.night_font = font;
+            } else {
+                window.screenLayout.day_font = font;
+            }
             renderScreenCanvas();
             renderScreenOptions();
         });
@@ -4229,7 +4396,7 @@ function renderScreenOptions() {
         filterRow.appendChild(filterSelect);
         opt.appendChild(filterRow);
 
-        appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold');
+        appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold', fontKey);
 
         const leadingRow = document.createElement('div');
         leadingRow.className = 'checkbox-container';
@@ -4259,7 +4426,55 @@ function renderScreenOptions() {
         breatheRow.appendChild(breatheLabel);
         opt.appendChild(breatheRow);
 
-        appendDisplayScheduleSection(opt);
+        appendDisplayScheduleSection(opt, {
+            listId: 'display-schedule-list',
+            titleKey: 'screen.display_schedule.title',
+            descriptionKey: 'screen.display_schedule.description',
+            settingsKey: 'p58'
+        });
+    }
+
+    if (e.id === 'time_aux') {
+        const mode = window.screenEditor.mode;
+        const fontKey = mode === 'night' ? 'night_aux_font' : 'day_aux_font';
+        ensureScreenLayoutMeta(window.screenLayout);
+
+        const modeNote = document.createElement('p');
+        modeNote.className = 'screen-options-mode-note';
+        modeNote.textContent = mode === 'night'
+            ? (getNestedTranslation(trans, 'screen.night_profile') || 'Night profile')
+            : (getNestedTranslation(trans, 'screen.day_profile') || 'Day profile');
+        opt.appendChild(modeNote);
+
+        const auxFontRow = document.createElement('div');
+        auxFontRow.className = 'form-group';
+        const auxFontLabel = document.createElement('label');
+        auxFontLabel.textContent = getNestedTranslation(trans, 'screen.aux_time_font') || 'Digit font';
+        const auxFontSelect = document.createElement('select');
+        SCREEN_TIME_FONTS.forEach(font => {
+            const option = document.createElement('option');
+            option.value = font;
+            option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
+            auxFontSelect.appendChild(option);
+        });
+        auxFontSelect.value = window.screenLayout[fontKey] || 'bold';
+        auxFontSelect.addEventListener('change', () => {
+            window.screenLayout[fontKey] = auxFontSelect.value;
+            renderScreenCanvas();
+            renderScreenOptions();
+        });
+        auxFontRow.appendChild(auxFontLabel);
+        auxFontRow.appendChild(auxFontSelect);
+        opt.appendChild(auxFontRow);
+
+        appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold', fontKey);
+
+        appendDisplayScheduleSection(opt, {
+            listId: 'display-schedule-aux-list',
+            titleKey: 'screen.display_schedule_aux.title',
+            descriptionKey: 'screen.display_schedule_aux.description',
+            settingsKey: 'p59'
+        });
     }
 
     if (isScreenTextElement(e.id)) {
@@ -4333,16 +4548,20 @@ function renderScreenOptions() {
             opt.appendChild(delayRow);
         }
 
-        if (isScreenStaticTextElement(e.id)) {
+        if (isScreenClippedTextElement(e.id)) {
             const widthRow = document.createElement('div');
             widthRow.className = 'form-group';
             const widthLabel = document.createElement('label');
-            widthLabel.textContent = getNestedTranslation(trans, 'screen.text_width') || 'Width (px, 0 = no limit)';
+            widthLabel.textContent = isScreenDigitLabelElement(e.id)
+                ? (getNestedTranslation(trans, 'screen.digit_label_width') || 'Width (px)')
+                : (getNestedTranslation(trans, 'screen.text_width') || 'Width (px, 0 = no limit)');
             const widthInput = document.createElement('input');
             widthInput.type = 'number';
             widthInput.min = '0';
             widthInput.max = '127';
-            widthInput.value = String(e.options.width || 0);
+            widthInput.value = String(e.options.width !== undefined
+                ? e.options.width
+                : (isScreenDigitLabelElement(e.id) ? 80 : 0));
             widthInput.addEventListener('change', () => {
                 e.options.width = clamp(parseInt(widthInput.value, 10) || 0, 0, 127);
                 renderScreenCanvas();
@@ -4388,10 +4607,12 @@ function renderScreenOptions() {
             });
         } else {
             if (!profile.static_texts) profile.static_texts = { ...SCREEN_DEFAULT_STATIC_TEXTS };
-            textArea.value = profile.static_texts[e.id] || '';
+            const textKey = getDigitLabelTextKey(e.id);
+            textArea.value = profile.static_texts[textKey] || '';
             textArea.addEventListener('input', () => {
-                profile.static_texts[e.id] = textArea.value;
+                profile.static_texts[textKey] = textArea.value;
                 renderScreenCanvas();
+                if (isScreenStaticTextElement(e.id)) renderScreenPalette();
             });
         }
         textRow.appendChild(textLabel);
@@ -4414,8 +4635,9 @@ function beginDrag(id, pointerEvent, fromPalette) {
     const scale = getScreenScale();
     window.screenEditor.scale = scale;
 
+    const def = findElementDef(id);
     let startLeft = elem.x * scale;
-    let startTop = elem.y * scale;
+    let startTop = layoutYToVisualY(elem.y || 0, def ? def.id : id) * scale;
 
     if (fromPalette) {
         window.screenEditor.selectedId = id;
@@ -4471,13 +4693,19 @@ function onScreenPointerMove(e) {
         }
         d.moved = true;
         const rect = canvas.getBoundingClientRect();
+        const def = findElementDef(d.id);
+        const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round((e.clientX - rect.left - 10) / scale), 0, SCREEN_SIZE - 1);
-        elem.y = clamp(Math.round((e.clientY - rect.top - 10) / scale), 0, SCREEN_SIZE - 1);
+        const visualY = clamp(Math.round((e.clientY - rect.top - 10) / scale), 0, SCREEN_SIZE - 1);
+        elem.y = visualYToLayoutY(visualY, elementId);
     } else {
         const newLeft = d.startLeft + dx;
         const newTop = d.startTop + dy;
+        const def = findElementDef(d.id);
+        const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round(newLeft / scale), 0, SCREEN_SIZE - 1);
-        elem.y = clamp(Math.round(newTop / scale), 0, SCREEN_SIZE - 1);
+        const visualY = clamp(Math.round(newTop / scale), 0, SCREEN_SIZE - 1);
+        elem.y = visualYToLayoutY(visualY, elementId);
     }
 
     renderScreenCanvas();
@@ -4712,18 +4940,16 @@ function buildSlotRow(slot) {
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
-    nameInput.placeholder = 'name (e.g. Outside Temp)';
-    nameInput.maxLength = 31;
+    nameInput.className = 'schedule-slot-label';
+    nameInput.placeholder = getScreenTranslation('screen.display_schedule.label_placeholder', 'label (e.g. Outside Temp)');
+    nameInput.maxLength = 25;
     nameInput.value = slot.n || '';
-    nameInput.hidden = slot.t !== 2 && slot.t !== 3;
 
     typeSelect.addEventListener('change', () => {
         const t = parseInt(typeSelect.value);
         const isHA = (t === 3);
-        const hasName = (t === 2 || t === 3);
         entityInput.hidden = !isHA;
         unitInput.hidden = !isHA;
-        nameInput.hidden = !hasName;
     });
 
     const removeBtn = document.createElement('button');
@@ -4741,26 +4967,30 @@ function buildSlotRow(slot) {
     return row;
 }
 
-function appendDisplayScheduleSection(container) {
+function appendDisplayScheduleSection(container, options = {}) {
     const trans = translations[currentLanguage] || translations.en;
+    const listId = options.listId || 'display-schedule-list';
+    const titleKey = options.titleKey || 'screen.display_schedule.title';
+    const descKey = options.descriptionKey || 'screen.display_schedule.description';
+    const settingsKey = options.settingsKey || 'p58';
+
     const section = document.createElement('div');
     section.className = 'screen-display-schedule';
 
     const heading = document.createElement('h4');
-    heading.textContent = getNestedTranslation(trans, 'screen.display_schedule.title') || 'Display Schedule';
+    heading.textContent = getNestedTranslation(trans, titleKey) || 'Display Schedule';
 
     const desc = document.createElement('p');
     desc.className = 'screen-options-mode-note';
-    desc.textContent = getNestedTranslation(trans, 'screen.display_schedule.description')
+    desc.textContent = getNestedTranslation(trans, descKey)
         || 'Define what appears on the display and for how long. Slots cycle in order. A single Time slot means the clock always shows.';
 
     const list = document.createElement('div');
-    list.id = 'display-schedule-list';
+    list.id = listId;
     list.className = 'display-schedule-list';
 
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
-    addBtn.id = 'add-schedule-slot';
     addBtn.className = 'button screen-schedule-add';
     addBtn.textContent = getNestedTranslation(trans, 'screen.display_schedule.add_slot') || '+ Add Slot';
     addBtn.addEventListener('click', () => {
@@ -4773,29 +5003,33 @@ function appendDisplayScheduleSection(container) {
     section.appendChild(addBtn);
     container.appendChild(section);
 
-    renderDisplaySchedule(list);
+    renderDisplaySchedule(list, settingsKey);
 }
 
-function renderDisplaySchedule(listEl) {
+function renderDisplaySchedule(listEl, settingsKey = 'p58') {
     const list = listEl || el('display-schedule-list');
     if (!list) return;
     list.innerHTML = '';
 
     let slots = [];
-    if (typeof window.settings.p58 === 'string' && window.settings.p58.trim().startsWith('[')) {
-        try { slots = JSON.parse(window.settings.p58); } catch (e) { slots = []; }
+    const raw = window.settings && window.settings[settingsKey];
+    if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+        try { slots = JSON.parse(raw); } catch (e) { slots = []; }
     }
-    if (!Array.isArray(slots) || slots.length === 0) {
+    if (settingsKey === 'p58' && (!Array.isArray(slots) || slots.length === 0)) {
         if ((window.settings.p48 || 0) > 0) slots.push({ t: 0, d: window.settings.p48 });
         if ((window.settings.p49 || 0) > 0) slots.push({ t: 1, d: window.settings.p49 });
         if ((window.settings.p57 || 0) > 0) slots.push({ t: 2, d: window.settings.p57 });
         if (slots.length === 0) slots.push({ t: 0, d: 30 });
     }
+    if (settingsKey === 'p59' && (!Array.isArray(slots) || slots.length === 0)) {
+        slots.push({ t: 0, d: 30 });
+    }
     slots.forEach(s => list.appendChild(buildSlotRow(s)));
 }
 
-function serializeDisplaySchedule() {
-    const list = el('display-schedule-list');
+function serializeDisplaySchedule(listId = 'display-schedule-list') {
+    const list = el(listId);
     if (!list) return '[]';
     const slots = [];
     list.querySelectorAll('.schedule-slot-row').forEach(row => {
@@ -4811,10 +5045,8 @@ function serializeDisplaySchedule() {
         if (t === 3) {
             if (entEl  && entEl.value.trim())  slot.e = entEl.value.trim();
             if (unitEl && unitEl.value.trim()) slot.l = unitEl.value.trim();
-            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
-        } else if (t === 2) {
-            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
         }
+        if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
         if (t !== 3 || slot.e) slots.push(slot);
     });
     return JSON.stringify(slots);

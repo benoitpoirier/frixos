@@ -74,9 +74,18 @@
     "ampm_note": "AM/PM-indikatoren vises kun ved 12-timers format (under Indstillinger).",
     "display_schedule": {
       "title": "Visningsskema",
-      "description": "Angiv hvad der vises på displayet og hvor længe. Slots skifter i rækkefølge. Et enkelt tidsslot betyder at uret altid vises.",
-      "add_slot": "+ Tilføj slot"
+      "description": "Angiv hvad der vises på den primære cifervisning og hvor længe. Slots skifter i rækkefølge. Et enkelt tidsslot betyder at uret altid vises.",
+      "add_slot": "+ Tilføj slot",
+      "label_placeholder": "etiket (f.eks. Udetemp.)"
     },
+    "display_schedule_aux": {
+      "title": "Visningsskema (Aux)",
+      "description": "Angiv hvad der vises på aux-cifervisningen og hvor længe. Slots skifter uafhængigt af den primære visning."
+    },
+    "aux_time_font": "Cifertypografi",
+    "empty_text_label": "(tom)",
+    "palette_text_icon": "Tekst",
+    "digit_label_width": "Bredde (px)",
     "show_leading_zero": "Vis 0 for encifret time",
     "disable_dots_breathe": "Deaktiver pulserende timepunkter",
     "editor_aria": "128×128-skærmredigering",
@@ -96,15 +105,20 @@
       "weather": "Vejr",
       "moon": "Måne",
       "time": "Ciffervisning",
-      "glucose": "Glukose",
+      "digit_label": "Cifferetiket",
+      "time_aux": "Cifervisning (Aux)",
+      "digit_label_aux": "Cifferetiket (Aux)",
       "ampm": "AM/PM",
       "message": "Rullende besked",
-      "text": "Tekst",
+      "text": "Ny tekstlinje",
       "text_1": "Tekst 1",
       "text_2": "Tekst 2",
       "text_3": "Tekst 3",
       "text_4": "Tekst 4",
-      "text_5": "Tekst 5"
+      "text_5": "Tekst 5",
+      "text_6": "Tekst 6",
+      "text_7": "Tekst 7",
+      "text_8": "Tekst 8"
     }
   },
   "advanced": {

@@ -106,7 +106,7 @@ Some adapters expose **RTS/DTR** and custom cables can automate toggling **EN** 
 
 ## Flashing from a computer
 
-1. Install and export the **ESP-IDF** environment (match the project’s IDF version, e.g. 5.x).  
+1. Install and export the **ESP-IDF** environment (match the project’s IDF version, e.g. 6.0.x).  
 2. Open a terminal in the firmware project directory.  
 3. Build if needed:  
    `idf.py build`  

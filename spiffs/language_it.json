@@ -74,9 +74,18 @@
     "ampm_note": "L'indicatore AM/PM è visibile solo con il formato 12 ore (da Impostazioni).",
     "display_schedule": {
       "title": "Programma di visualizzazione",
-      "description": "Definisci cosa appare sul display e per quanto tempo. Gli slot ruotano in ordine. Un solo slot Ora significa che l'orologio è sempre visibile.",
-      "add_slot": "+ Aggiungi slot"
+      "description": "Definisci cosa appare sul display numerico principale e per quanto tempo. Gli slot ruotano in ordine. Un solo slot Ora significa che l'orologio è sempre visibile.",
+      "add_slot": "+ Aggiungi slot",
+      "label_placeholder": "etichetta (es. Temp. esterna)"
     },
+    "display_schedule_aux": {
+      "title": "Programma di visualizzazione (Aux)",
+      "description": "Definisci cosa appare sul display numerico aux e per quanto tempo. Gli slot ruotano indipendentemente dal display principale."
+    },
+    "aux_time_font": "Font cifre",
+    "empty_text_label": "(vuoto)",
+    "palette_text_icon": "Testo",
+    "digit_label_width": "Larghezza (px)",
     "show_leading_zero": "Mostra 0 per ora a cifra singola",
     "disable_dots_breathe": "Disabilita punti ora pulsanti",
     "editor_aria": "Editor schermo 128×128",
@@ -96,15 +105,20 @@
       "weather": "Meteo",
       "moon": "Luna",
       "time": "Display numerico",
-      "glucose": "Glucosio",
+      "digit_label": "Etichetta numeri",
+      "time_aux": "Display numerico (Aux)",
+      "digit_label_aux": "Etichetta numeri (Aux)",
       "ampm": "AM/PM",
       "message": "Messaggio scorrevole",
-      "text": "Testo",
+      "text": "Nuova riga di testo",
       "text_1": "Testo 1",
       "text_2": "Testo 2",
       "text_3": "Testo 3",
       "text_4": "Testo 4",
-      "text_5": "Testo 5"
+      "text_5": "Testo 5",
+      "text_6": "Testo 6",
+      "text_7": "Testo 7",
+      "text_8": "Testo 8"
     }
   },
   "advanced": {

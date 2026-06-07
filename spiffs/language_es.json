@@ -78,9 +78,18 @@
     "ampm_note": "El indicador AM/PM solo es visible con formato de 12 horas (en Ajustes).",
     "display_schedule": {
       "title": "Programación de pantalla",
-      "description": "Define qué aparece en la pantalla y durante cuánto tiempo. Los intervalos rotan en orden. Un solo intervalo de hora significa que el reloj siempre se muestra.",
-      "add_slot": "+ Añadir intervalo"
+      "description": "Define qué aparece en el display numérico principal y durante cuánto tiempo. Los intervalos rotan en orden. Un solo intervalo de hora significa que el reloj siempre se muestra.",
+      "add_slot": "+ Añadir intervalo",
+      "label_placeholder": "etiqueta (p. ej. Temp. exterior)"
     },
+    "display_schedule_aux": {
+      "title": "Programación de pantalla (Aux)",
+      "description": "Define qué aparece en el display numérico aux y durante cuánto tiempo. Los intervalos rotan de forma independiente del display principal."
+    },
+    "aux_time_font": "Fuente de dígitos",
+    "empty_text_label": "(vacío)",
+    "palette_text_icon": "Texto",
+    "digit_label_width": "Ancho (px)",
     "show_leading_zero": "Mostrar 0 para hora de un solo dígito",
     "disable_dots_breathe": "Desactivar puntos de hora pulsantes",
     "editor_aria": "Editor de pantalla 128×128",
@@ -100,15 +109,20 @@
       "weather": "Tiempo",
       "moon": "Luna",
       "time": "Pantalla de dígitos",
-      "glucose": "Glucosa",
+      "digit_label": "Etiqueta numérica",
+      "time_aux": "Display numérico (Aux)",
+      "digit_label_aux": "Etiqueta numérica (Aux)",
       "ampm": "AM/PM",
       "message": "Mensaje desplazable",
-      "text": "Texto",
+      "text": "Nueva línea de texto",
       "text_1": "Texto 1",
       "text_2": "Texto 2",
       "text_3": "Texto 3",
       "text_4": "Texto 4",
-      "text_5": "Texto 5"
+      "text_5": "Texto 5",
+      "text_6": "Texto 6",
+      "text_7": "Texto 7",
+      "text_8": "Texto 8"
     }
   },
   "advanced": {

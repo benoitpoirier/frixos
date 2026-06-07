@@ -74,9 +74,18 @@
     "ampm_note": "Wskaźnik AM/PM jest widoczny tylko w formacie 12-godzinnym (w Ustawieniach).",
     "display_schedule": {
       "title": "Harmonogram wyświetlania",
-      "description": "Określ, co pojawia się na wyświetlaczu i jak długo. Sloty przełączają się po kolei. Pojedynczy slot czasu oznacza, że zegar jest zawsze widoczny.",
-      "add_slot": "+ Dodaj slot"
+      "description": "Określ, co pojawia się na głównym wyświetlaczu cyfrowym i jak długo. Sloty przełączają się po kolei. Pojedynczy slot czasu oznacza, że zegar jest zawsze widoczny.",
+      "add_slot": "+ Dodaj slot",
+      "label_placeholder": "etykieta (np. Temp. zewn.)"
     },
+    "display_schedule_aux": {
+      "title": "Harmonogram wyświetlania (Aux)",
+      "description": "Określ, co pojawia się na pomocniczym wyświetlaczu cyfrowym i jak długo. Sloty przełączają się niezależnie od wyświetlacza głównego."
+    },
+    "aux_time_font": "Czcionka cyfr",
+    "empty_text_label": "(pusty)",
+    "palette_text_icon": "Tekst",
+    "digit_label_width": "Szerokość (px)",
     "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
     "disable_dots_breathe": "Wyłącz pulsujące kropki godziny",
     "editor_aria": "Edytor ekranu 128×128",
@@ -96,15 +105,20 @@
       "weather": "Pogoda",
       "moon": "Księżyc",
       "time": "Wyświetlacz cyfr",
-      "glucose": "Glukoza",
+      "digit_label": "Etykieta cyfr",
+      "time_aux": "Wyświetlacz cyfrowy (Aux)",
+      "digit_label_aux": "Etykieta cyfr (Aux)",
       "ampm": "AM/PM",
       "message": "Przewijany komunikat",
-      "text": "Tekst",
+      "text": "Nowa linia tekstu",
       "text_1": "Tekst 1",
       "text_2": "Tekst 2",
       "text_3": "Tekst 3",
       "text_4": "Tekst 4",
-      "text_5": "Tekst 5"
+      "text_5": "Tekst 5",
+      "text_6": "Tekst 6",
+      "text_7": "Tekst 7",
+      "text_8": "Tekst 8"
     }
   },
   "advanced": {

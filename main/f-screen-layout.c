@@ -7,6 +7,9 @@ static const char *const k_default_static_texts[SCREEN_STATIC_TEXT_COUNT] = {
     "Wind [wind]",
     "Gust [gust]",
     "Rain [precip]",
+    "",
+    "",
+    "",
 };
 
 static void screen_layout_init_static_texts(screen_layout_profile_t *profile)
@@ -19,7 +22,7 @@ static void screen_layout_init_static_texts(screen_layout_profile_t *profile)
     w->y = 90;
     w->z = (uint8_t)((1 + i) <= 4 ? (1 + i) : 4);
     w->font = 0;
-    w->width = 0;
+    w->width = 80;
     w->align = SCREEN_MSG_ALIGN_LEFT;
     w->color_r = 255;
     w->color_g = 255;
@@ -48,7 +51,39 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     p->widget[SCREEN_ELEM_MOON] = (screen_widget_t){.enabled = 1, .x = 87, .y = 29, .z = 3};
     p->widget[SCREEN_ELEM_TIME] = (screen_widget_t){.enabled = 1, .x = 22, .y = 47, .z = 1};
     p->widget[SCREEN_ELEM_AMPM] = (screen_widget_t){.enabled = 1, .x = 101, .y = 54, .z = 2};
-    p->widget[SCREEN_ELEM_GLUCOSE] = (screen_widget_t){.enabled = 0, .x = 22, .y = 47, .z = 1};
+    p->widget[SCREEN_ELEM_TIME_AUX] = (screen_widget_t){.enabled = 0, .x = 22, .y = 47, .z = 1};
+    p->widget[SCREEN_ELEM_DIGIT_LABEL] = (screen_widget_t){
+        .enabled = 0,
+        .x = 22,
+        .y = 84,
+        .z = 1,
+        .font = 0,
+        .width = 80,
+        .align = SCREEN_MSG_ALIGN_LEFT,
+        .color_r = 255,
+        .color_g = 255,
+        .color_b = 255,
+        .bg_r = 0,
+        .bg_g = 0,
+        .bg_b = 0,
+    };
+    p->widget[SCREEN_ELEM_DIGIT_LABEL_AUX] = (screen_widget_t){
+        .enabled = 0,
+        .x = 22,
+        .y = 84,
+        .z = 1,
+        .font = 0,
+        .width = 80,
+        .align = SCREEN_MSG_ALIGN_LEFT,
+        .color_r = 255,
+        .color_g = 255,
+        .color_b = 255,
+        .bg_r = 0,
+        .bg_g = 0,
+        .bg_b = 0,
+    };
+    p->digit_label_text[0] = '\0';
+    p->digit_label_aux_text[0] = '\0';
     p->widget[SCREEN_ELEM_MESSAGE] = (screen_widget_t){
         .enabled = 1,
         .x = 0,

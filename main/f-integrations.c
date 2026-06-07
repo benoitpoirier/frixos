@@ -864,10 +864,15 @@ void parse_HA_entities(const char *input)
 /* Append any display-schedule HA entities that aren't already in the token list. */
 void add_display_schedule_ha_entities(void)
 {
-    for (int i = 0; i < display_schedule_count; i++)
+    for (int sched = 0; sched < 2; sched++)
     {
-        if (display_schedule[i].type != SLOT_TYPE_HA) continue;
-        const char *entity = display_schedule[i].entity;
+        const display_slot_t *slots = sched == 0 ? display_schedule : display_schedule_aux;
+        const int slot_count = sched == 0 ? display_schedule_count : display_schedule_aux_count;
+
+    for (int i = 0; i < slot_count; i++)
+    {
+        if (slots[i].type != SLOT_TYPE_HA) continue;
+        const char *entity = slots[i].entity;
         if (entity[0] == '\0') continue;
 
         /* Check if already present */
@@ -902,6 +907,7 @@ void add_display_schedule_ha_entities(void)
         }
         integration_active_tokens_count[INTEGRATION_HA]++;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Registered display-schedule HA entity: %s", entity);
+    }
     }
 }
 

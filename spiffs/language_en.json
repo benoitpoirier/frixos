@@ -84,9 +84,18 @@
     "ampm_note": "AM/PM indicator is only visible when 12-hour format is used (from Settings).",
     "display_schedule": {
       "title": "Display Schedule",
-      "description": "Define what appears on the display and for how long. Slots cycle in order. A single Time slot means the clock always shows.",
-      "add_slot": "+ Add Slot"
+      "description": "Define what appears on the primary digit display and for how long. Slots cycle in order. A single Time slot means the clock always shows.",
+      "add_slot": "+ Add Slot",
+      "label_placeholder": "label (e.g. Outside Temp)"
     },
+    "display_schedule_aux": {
+      "title": "Display Schedule (Aux)",
+      "description": "Define what appears on the aux digit display and for how long. Slots cycle independently from the primary display."
+    },
+    "aux_time_font": "Digit font",
+    "empty_text_label": "(empty)",
+    "palette_text_icon": "Text",
+    "digit_label_width": "Width (px)",
     "show_leading_zero": "Show 0 for single digit hour",
     "disable_dots_breathe": "Disable breathing time dots",
     "editor_aria": "128x128 screen editor",
@@ -106,15 +115,20 @@
       "weather": "Weather",
       "moon": "Moon",
       "time": "Digit Display",
-      "glucose": "Glucose",
+      "digit_label": "Digit Label",
+      "time_aux": "Digit Display (Aux)",
+      "digit_label_aux": "Digit Label (Aux)",
       "ampm": "AM/PM",
       "message": "Scrolling Message",
-      "text": "Text",
+      "text": "New Text Line",
       "text_1": "Text 1",
       "text_2": "Text 2",
       "text_3": "Text 3",
       "text_4": "Text 4",
-      "text_5": "Text 5"
+      "text_5": "Text 5",
+      "text_6": "Text 6",
+      "text_7": "Text 7",
+      "text_8": "Text 8"
     }
   },
   "advanced": {

@@ -35,11 +35,22 @@ idf_component_register(SRCS
     REQUIRES esp_wifi
     REQUIRES nvs_flash
     REQUIRES esp_https_server
+    REQUIRES esp_http_server
     REQUIRES esp_http_client
-    REQUIRES wifi_provisioning
-    REQUIRES json
     REQUIRES app_update
     REQUIRES spi_flash
+    REQUIRES esp_driver_gpio
+    REQUIRES esp_driver_i2c
+    REQUIRES esp_driver_spi
+    REQUIRES esp_driver_ledc
+    REQUIRES esp_timer
+    REQUIRES esp_lcd
+    REQUIRES esp_netif
+    REQUIRES esp_event
+    REQUIRES lwip
+    REQUIRES mbedtls
+    REQUIRES esp-tls
+    REQUIRES vfs
     REQUIRES teriyakigod__esp_lcd_st7735)
 
     target_compile_options(${COMPONENT_LIB} PRIVATE "-fno-jump-tables" "-fno-tree-switch-conversion")

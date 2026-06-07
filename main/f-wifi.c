@@ -793,6 +793,8 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_CONNECTED:
     case HTTP_EVENT_DISCONNECTED:
     case HTTP_EVENT_HEADERS_SENT:
+    case HTTP_EVENT_ON_HEADERS_COMPLETE:
+    case HTTP_EVENT_ON_STATUS_CODE:
         break;
 
     case HTTP_EVENT_ON_DATA:
@@ -867,6 +869,8 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HTTP Event: FINISH");
+        break;
+    default:
         break;
     }
     return ESP_OK;

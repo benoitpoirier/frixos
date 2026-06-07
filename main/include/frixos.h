@@ -82,7 +82,8 @@ extern uint8_t eeprom_dim_end;     // Time-of-day dimming end hour (0-23)
 extern char eeprom_lat[12], my_lat[12];                         // "48.123456";
 extern char eeprom_lon[12], my_lon[12];                         // "16.123456";
 extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.5.0/3,M10.5.0/4";
-extern char eeprom_font[2][12]; // [0] = day font, [1] = night font
+extern char eeprom_font[2][12];     // [0] = day font, [1] = night font
+extern char eeprom_aux_font[2][12]; // [0] = day aux digit font, [1] = night aux
 extern float eeprom_lux_sensitivity;
 extern float eeprom_lux_threshold;
 extern uint8_t eeprom_brightness_LED[2]; // in pct
@@ -159,6 +160,7 @@ extern uint8_t eeprom_sec_time;
 extern uint8_t eeprom_sec_cgm;
 extern uint8_t eeprom_sec_weather;
 extern char    eeprom_disp_sched[512];
+extern char    eeprom_disp_sched_aux[512];
 
 /* --- Display schedule --- */
 typedef enum {
@@ -170,19 +172,23 @@ typedef enum {
 
 #define MAX_DISPLAY_SLOTS  8
 #define SLOT_ENTITY_LEN    64
+#define SLOT_NAME_LEN      26   /* max 25 characters + NUL */
 
 typedef struct {
     slot_type_t type;
     uint16_t    duration;                /* seconds to show this slot */
     char        entity[SLOT_ENTITY_LEN]; /* HA entity ID (SLOT_TYPE_HA only) */
     char        label[8];               /* short unit shown next to digits, e.g. "°F", "W" */
-    char        name[32];               /* display name shown in scroll message while active */
+    char        name[SLOT_NAME_LEN];    /* optional label on Digit Label while slot is active */
 } display_slot_t;
 
 extern display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
 extern int            display_schedule_count;
+extern display_slot_t display_schedule_aux[MAX_DISPLAY_SLOTS];
+extern int            display_schedule_aux_count;
 
 void parse_display_schedule(const char *json);
+void parse_display_schedule_aux(const char *json);
 void migrate_schedule_from_legacy(void);
 
 extern char eeprom_libre_patient_id[64];
@@ -226,10 +232,10 @@ extern char boot_ip_address[18];
 // Screen layout configuration
 // --------------------------
 // Two profiles: [0]=day, [1]=night. Selected at runtime by font_index (lux-driven).
-#define FRIXOS_SCREEN_LAYOUT_VERSION 7
+#define FRIXOS_SCREEN_LAYOUT_VERSION 9
 #define FRIXOS_SCREEN_LAYOUT_PROFILES 2
 #define SCREEN_STATIC_TEXT_LENGTH 96
-#define SCREEN_STATIC_TEXT_COUNT 5
+#define SCREEN_STATIC_TEXT_COUNT 8
 
 #define SCREEN_MSG_ALIGN_LEFT 0
 #define SCREEN_MSG_ALIGN_CENTER 1
@@ -249,8 +255,13 @@ typedef enum
   SCREEN_ELEM_TEXT_3 = 9,
   SCREEN_ELEM_TEXT_4 = 10,
   SCREEN_ELEM_TEXT_5 = 11,
-  SCREEN_ELEM_AMPM = 12,
-  SCREEN_ELEM_GLUCOSE = 13,
+  SCREEN_ELEM_TEXT_6 = 12,
+  SCREEN_ELEM_TEXT_7 = 13,
+  SCREEN_ELEM_TEXT_8 = 14,
+  SCREEN_ELEM_AMPM = 15,
+  SCREEN_ELEM_TIME_AUX = 16,
+  SCREEN_ELEM_DIGIT_LABEL = 17,
+  SCREEN_ELEM_DIGIT_LABEL_AUX = 18,
   SCREEN_ELEM_COUNT
 } screen_element_id_t;
 
@@ -276,6 +287,8 @@ typedef struct
   screen_widget_t widget[SCREEN_ELEM_COUNT];
   char scroll_text[SCROLL_MSG_LENGTH];
   char static_text[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
+  char digit_label_text[SCREEN_STATIC_TEXT_LENGTH];
+  char digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH];
 } screen_layout_profile_t;
 
 typedef struct
@@ -290,12 +303,22 @@ extern screen_layout_t eeprom_screen_layout;
 
 static inline bool screen_elem_is_static_text(screen_element_id_t id)
 {
-  return id >= SCREEN_ELEM_TEXT_1 && id <= SCREEN_ELEM_TEXT_5;
+  return id >= SCREEN_ELEM_TEXT_1 && id <= SCREEN_ELEM_TEXT_8;
+}
+
+static inline bool screen_elem_is_digit_label(screen_element_id_t id)
+{
+  return id == SCREEN_ELEM_DIGIT_LABEL || id == SCREEN_ELEM_DIGIT_LABEL_AUX;
 }
 
 static inline bool screen_elem_is_text(screen_element_id_t id)
 {
-  return id == SCREEN_ELEM_MESSAGE || screen_elem_is_static_text(id);
+  return id == SCREEN_ELEM_MESSAGE || screen_elem_is_static_text(id) || screen_elem_is_digit_label(id);
+}
+
+static inline bool screen_elem_has_text_layout(screen_element_id_t id)
+{
+  return screen_elem_is_static_text(id) || screen_elem_is_digit_label(id);
 }
 
 static inline int screen_static_text_index(screen_element_id_t id)
@@ -320,7 +343,7 @@ void screen_layout_ensure_valid(void);
 #define LCD_PIXEL_CLK_HZ    (40 * 1000 * 1000)
 #define LCD_CMD_BITS        (8)
 #define LCD_PARAM_BITS      (8)
-#define LCD_COLOR_SPACE     (ESP_LCD_COLOR_SPACE_BGR)
+#define LCD_RGB_ELEMENT_ORDER (LCD_RGB_ELEMENT_ORDER_BGR)
 #define LCD_BITS_PER_PIXEL  (16)
 #define LCD_BL_ON_LEVEL     (1)
 
