@@ -64,8 +64,8 @@ lichten-font.jpg
 timezone.txt
 robrito-font.jpg
 kablame-font.jpg
-language_en.json
 language_da.json
+language_en.json
 language_sv.json
 language_it.json
 language_pl.json

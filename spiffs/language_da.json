@@ -72,6 +72,11 @@
     "save_to_file": "Gem til fil",
     "read_from_file": "Læs fra fil",
     "ampm_note": "AM/PM-indikatoren vises kun ved 12-timers format (under Indstillinger).",
+    "display_schedule": {
+      "title": "Visningsskema",
+      "description": "Angiv hvad der vises på displayet og hvor længe. Slots skifter i rækkefølge. Et enkelt tidsslot betyder at uret altid vises.",
+      "add_slot": "+ Tilføj slot"
+    },
     "show_leading_zero": "Vis 0 for encifret time",
     "disable_dots_breathe": "Deaktiver pulserende timepunkter",
     "editor_aria": "128×128-skærmredigering",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi fra",
       "weather": "Vejr",
       "moon": "Måne",
-      "time": "Tid/Glukose",
+      "time": "Ciffervisning",
       "glucose": "Glukose",
       "ampm": "AM/PM",
       "message": "Rullende besked",

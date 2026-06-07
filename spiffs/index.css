@@ -528,6 +528,68 @@ body {
     margin: 10px 0 6px;
 }
 
+.screen-display-schedule {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.screen-display-schedule h4 {
+    margin: 0 0 8px;
+}
+
+.display-schedule-list {
+    margin-bottom: 10px;
+}
+
+.schedule-slot-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.schedule-slot-row select {
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row input[type="number"] {
+    width: 70px;
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row .schedule-slot-sec {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.schedule-slot-row input[type="text"] {
+    flex: 1 1 120px;
+    min-width: 100px;
+}
+
+.schedule-slot-row input.schedule-slot-entity {
+    flex: 1 1 160px;
+    min-width: 120px;
+}
+
+.schedule-slot-row input.schedule-slot-unit {
+    width: 70px;
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row button {
+    flex: 0 0 auto;
+    cursor: pointer;
+    padding: 2px 8px;
+}
+
+.screen-schedule-add {
+    margin-top: 4px;
+}
+
 .screen-options-mode-note {
     margin: 0 0 10px;
     font-size: 0.85rem;

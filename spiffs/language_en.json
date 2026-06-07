@@ -82,6 +82,11 @@
     "save_to_file": "Save to File",
     "read_from_file": "Read from File",
     "ampm_note": "AM/PM indicator is only visible when 12-hour format is used (from Settings).",
+    "display_schedule": {
+      "title": "Display Schedule",
+      "description": "Define what appears on the display and for how long. Slots cycle in order. A single Time slot means the clock always shows.",
+      "add_slot": "+ Add Slot"
+    },
     "show_leading_zero": "Show 0 for single digit hour",
     "disable_dots_breathe": "Disable breathing time dots",
     "editor_aria": "128x128 screen editor",
@@ -100,7 +105,7 @@
       "wifi_off": "WiFi off",
       "weather": "Weather",
       "moon": "Moon",
-      "time": "Time/Glucose",
+      "time": "Digit Display",
       "glucose": "Glucose",
       "ampm": "AM/PM",
       "message": "Scrolling Message",

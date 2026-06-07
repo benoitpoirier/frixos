@@ -72,6 +72,11 @@
     "save_to_file": "Spara till fil",
     "read_from_file": "Läs från fil",
     "ampm_note": "AM/PM-indikatorn visas endast med 12-timmarsformat (i Inställningar).",
+    "display_schedule": {
+      "title": "Visningsschema",
+      "description": "Ange vad som visas på skärmen och hur länge. Platserna växlar i ordning. En enda tidsplats betyder att klockan alltid visas.",
+      "add_slot": "+ Lägg till plats"
+    },
     "show_leading_zero": "Visa 0 för ensiffrig timme",
     "disable_dots_breathe": "Inaktivera pulserande tidpunkter",
     "editor_aria": "128×128-skärmredigerare",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi av",
       "weather": "Väder",
       "moon": "Måne",
-      "time": "Tid/Glukos",
+      "time": "Siffervisning",
       "glucose": "Glukos",
       "ampm": "AM/PM",
       "message": "Rullande meddelande",

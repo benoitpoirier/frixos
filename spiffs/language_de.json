@@ -79,6 +79,11 @@
     "save_to_file": "In Datei speichern",
     "read_from_file": "Aus Datei lesen",
     "ampm_note": "Die AM/PM-Anzeige ist nur bei 12-Stunden-Format sichtbar (unter Einstellungen).",
+    "display_schedule": {
+      "title": "Anzeigeplan",
+      "description": "Legen Sie fest, was auf dem Display erscheint und wie lange. Die Slots wechseln der Reihe nach. Ein einzelner Zeit-Slot bedeutet, dass die Uhr immer angezeigt wird.",
+      "add_slot": "+ Slot hinzufügen"
+    },
     "show_leading_zero": "0 für einstellige Stunde anzeigen",
     "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
     "editor_aria": "128×128-Bildschirm-Editor",
@@ -97,7 +102,7 @@
       "wifi_off": "WiFi aus",
       "weather": "Wetter",
       "moon": "Mond",
-      "time": "Zeit/Glukose",
+      "time": "Ziffernanzeige",
       "glucose": "Glukose",
       "ampm": "AM/PM",
       "message": "Laufnachricht",

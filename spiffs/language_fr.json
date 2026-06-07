@@ -72,6 +72,11 @@
     "save_to_file": "Enregistrer dans un fichier",
     "read_from_file": "Lire depuis un fichier",
     "ampm_note": "L'indicateur AM/PM n'est visible qu'avec le format 12 heures (dans Paramètres).",
+    "display_schedule": {
+      "title": "Programme d'affichage",
+      "description": "Définissez ce qui apparaît sur l'écran et pendant combien de temps. Les créneaux défilent dans l'ordre. Un seul créneau Heure signifie que l'horloge est toujours affichée.",
+      "add_slot": "+ Ajouter un créneau"
+    },
     "show_leading_zero": "Afficher 0 pour les heures à un chiffre",
     "disable_dots_breathe": "Désactiver les points d'heure pulsants",
     "editor_aria": "Éditeur d'écran 128×128",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi désactivé",
       "weather": "Météo",
       "moon": "Lune",
-      "time": "Heure/Glucose",
+      "time": "Affichage numérique",
       "glucose": "Glucose",
       "ampm": "AM/PM",
       "message": "Message défilant",

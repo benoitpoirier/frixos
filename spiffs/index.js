@@ -1712,11 +1712,6 @@ function handleFormSubmit(e, formId) {
             changedCount++;
         }
 
-        const newSched = serializeDisplaySchedule();
-        if (addIfChanged(formData, 'p58', newSched, window.settings.p58)) {
-            changedCount++;
-        }
-
         const glucoseUsernameInput = getFieldInForm('eeprom_glucose_username');
         if (glucoseUsernameInput) {
             const newUser = glucoseUsernameInput.value.trim();
@@ -3250,7 +3245,7 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'default-wifi-off.jpg' },
     { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'default-weather.jpg' },
     { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg' },
-    { id: 'time', label: 'Time/Glucose', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
+    { id: 'time', label: 'Digit Display', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
     { id: 'glucose', label: 'Glucose', w: 70, h: 36, img: 'glucose.jpg', paletteFitFullImage: true },
     { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
     { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
@@ -3791,7 +3786,7 @@ async function fetchScreenLayout() {
     try {
         await refreshScreenLayoutSelect();
         const [settingsResp, response] = await Promise.all([
-            fetch('/api/settings?params=p24,p50'),
+            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58'),
             fetch('/api/screen')
         ]);
         if (settingsResp.ok) {
@@ -3819,15 +3814,19 @@ async function fetchScreenLayout() {
 async function saveScreenTimeDisplaySettings() {
     const leading = el('screen_show_leading_zero');
     const dots = el('screen_dots_breathe');
-    if (!leading && !dots) return true;
+    const scheduleList = el('display-schedule-list');
 
     const formData = {};
     if (leading) formData.p24 = leading.checked ? 1 : 0;
     if (dots) formData.p50 = dots.checked ? 1 : 0;
+    if (scheduleList) {
+        const newSched = serializeDisplaySchedule();
+        if (newSched !== (window.settings.p58 || '')) {
+            formData.p58 = newSched;
+        }
+    }
 
-    const unchanged = (leading === null || formData.p24 === window.settings.p24)
-        && (dots === null || formData.p50 === window.settings.p50);
-    if (unchanged) return true;
+    if (Object.keys(formData).length === 0) return true;
 
     try {
         const response = await fetch('/api/settings', {
@@ -4259,6 +4258,8 @@ function renderScreenOptions() {
         breatheRow.appendChild(breatheInput);
         breatheRow.appendChild(breatheLabel);
         opt.appendChild(breatheRow);
+
+        appendDisplayScheduleSection(opt);
     }
 
     if (isScreenTextElement(e.id)) {
@@ -4673,10 +4674,8 @@ const SLOT_TYPES = [
 function buildSlotRow(slot) {
     const row = document.createElement('div');
     row.className = 'schedule-slot-row';
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;';
 
     const typeSelect = document.createElement('select');
-    typeSelect.style.cssText = 'flex:0 0 auto;';
     SLOT_TYPES.forEach(opt => {
         const o = document.createElement('option');
         o.value = opt.value;
@@ -4690,49 +4689,46 @@ function buildSlotRow(slot) {
     durInput.min = 1;
     durInput.max = 3600;
     durInput.value = slot.d || 30;
-    durInput.style.cssText = 'width:70px;flex:0 0 auto;';
     durInput.title = 'Duration (seconds)';
 
     const durLabel = document.createElement('span');
+    durLabel.className = 'schedule-slot-sec';
     durLabel.textContent = 'sec';
-    durLabel.style.cssText = 'flex:0 0 auto;color:#999;font-size:0.9em;';
 
     const entityInput = document.createElement('input');
     entityInput.type = 'text';
+    entityInput.className = 'schedule-slot-entity';
     entityInput.placeholder = 'entity_id (e.g. sensor.temp)';
     entityInput.value = slot.e || '';
-    entityInput.style.cssText = 'flex:1 1 160px;min-width:120px;';
-    entityInput.style.display = (slot.t === 3) ? '' : 'none';
+    entityInput.hidden = slot.t !== 3;
 
     const unitInput = document.createElement('input');
     unitInput.type = 'text';
+    unitInput.className = 'schedule-slot-unit';
     unitInput.placeholder = 'unit (e.g. °F)';
     unitInput.maxLength = 7;
     unitInput.value = slot.l || '';
-    unitInput.style.cssText = 'width:70px;flex:0 0 auto;';
-    unitInput.style.display = (slot.t === 3) ? '' : 'none';
+    unitInput.hidden = slot.t !== 3;
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.placeholder = 'name (e.g. Outside Temp)';
     nameInput.maxLength = 31;
     nameInput.value = slot.n || '';
-    nameInput.style.cssText = 'flex:1 1 120px;min-width:100px;';
-    nameInput.style.display = (slot.t === 2 || slot.t === 3) ? '' : 'none';
+    nameInput.hidden = slot.t !== 2 && slot.t !== 3;
 
     typeSelect.addEventListener('change', () => {
         const t = parseInt(typeSelect.value);
         const isHA = (t === 3);
         const hasName = (t === 2 || t === 3);
-        entityInput.style.display = isHA ? '' : 'none';
-        unitInput.style.display   = isHA ? '' : 'none';
-        nameInput.style.display   = hasName ? '' : 'none';
+        entityInput.hidden = !isHA;
+        unitInput.hidden = !isHA;
+        nameInput.hidden = !hasName;
     });
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.textContent = '✕';
-    removeBtn.style.cssText = 'flex:0 0 auto;cursor:pointer;padding:2px 8px;';
     removeBtn.addEventListener('click', () => row.remove());
 
     row.appendChild(typeSelect);
@@ -4745,31 +4741,57 @@ function buildSlotRow(slot) {
     return row;
 }
 
-function renderDisplaySchedule() {
-    const list = el('display-schedule-list');
+function appendDisplayScheduleSection(container) {
+    const trans = translations[currentLanguage] || translations.en;
+    const section = document.createElement('div');
+    section.className = 'screen-display-schedule';
+
+    const heading = document.createElement('h4');
+    heading.textContent = getNestedTranslation(trans, 'screen.display_schedule.title') || 'Display Schedule';
+
+    const desc = document.createElement('p');
+    desc.className = 'screen-options-mode-note';
+    desc.textContent = getNestedTranslation(trans, 'screen.display_schedule.description')
+        || 'Define what appears on the display and for how long. Slots cycle in order. A single Time slot means the clock always shows.';
+
+    const list = document.createElement('div');
+    list.id = 'display-schedule-list';
+    list.className = 'display-schedule-list';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.id = 'add-schedule-slot';
+    addBtn.className = 'button screen-schedule-add';
+    addBtn.textContent = getNestedTranslation(trans, 'screen.display_schedule.add_slot') || '+ Add Slot';
+    addBtn.addEventListener('click', () => {
+        list.appendChild(buildSlotRow({ t: 0, d: 30 }));
+    });
+
+    section.appendChild(heading);
+    section.appendChild(desc);
+    section.appendChild(list);
+    section.appendChild(addBtn);
+    container.appendChild(section);
+
+    renderDisplaySchedule(list);
+}
+
+function renderDisplaySchedule(listEl) {
+    const list = listEl || el('display-schedule-list');
     if (!list) return;
     list.innerHTML = '';
 
     let slots = [];
     if (typeof window.settings.p58 === 'string' && window.settings.p58.trim().startsWith('[')) {
-        try { slots = JSON.parse(window.settings.p58); } catch(e) { slots = []; }
+        try { slots = JSON.parse(window.settings.p58); } catch (e) { slots = []; }
     }
     if (!Array.isArray(slots) || slots.length === 0) {
-        // Migrate from legacy p48/p49/p57 defaults so the UI isn't blank
-        if ((window.settings.p48 || 0) > 0) slots.push({t:0, d: window.settings.p48});
-        if ((window.settings.p49 || 0) > 0) slots.push({t:1, d: window.settings.p49});
-        if ((window.settings.p57 || 0) > 0) slots.push({t:2, d: window.settings.p57});
-        if (slots.length === 0) slots.push({t:0, d:30});
+        if ((window.settings.p48 || 0) > 0) slots.push({ t: 0, d: window.settings.p48 });
+        if ((window.settings.p49 || 0) > 0) slots.push({ t: 1, d: window.settings.p49 });
+        if ((window.settings.p57 || 0) > 0) slots.push({ t: 2, d: window.settings.p57 });
+        if (slots.length === 0) slots.push({ t: 0, d: 30 });
     }
     slots.forEach(s => list.appendChild(buildSlotRow(s)));
-
-    const addBtn = el('add-schedule-slot');
-    if (addBtn && !addBtn._listenerSet) {
-        addBtn._listenerSet = true;
-        addBtn.addEventListener('click', () => {
-            list.appendChild(buildSlotRow({t:0, d:30}));
-        });
-    }
 }
 
 function serializeDisplaySchedule() {
@@ -4940,8 +4962,6 @@ function setupIntegrationsSection() {
         if (glucoseValidity && typeof window.settings.p45 !== 'undefined') {
             glucoseValidity.value = window.settings.p45 || 30;
         }
-
-        renderDisplaySchedule();
 
         // Load shared username (p31)
         if (glucoseUsername && typeof window.settings.p31 !== 'undefined') {

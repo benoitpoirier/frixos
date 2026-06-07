@@ -72,6 +72,11 @@
     "save_to_file": "Salva su file",
     "read_from_file": "Leggi da file",
     "ampm_note": "L'indicatore AM/PM è visibile solo con il formato 12 ore (da Impostazioni).",
+    "display_schedule": {
+      "title": "Programma di visualizzazione",
+      "description": "Definisci cosa appare sul display e per quanto tempo. Gli slot ruotano in ordine. Un solo slot Ora significa che l'orologio è sempre visibile.",
+      "add_slot": "+ Aggiungi slot"
+    },
     "show_leading_zero": "Mostra 0 per ora a cifra singola",
     "disable_dots_breathe": "Disabilita punti ora pulsanti",
     "editor_aria": "Editor schermo 128×128",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi disattivato",
       "weather": "Meteo",
       "moon": "Luna",
-      "time": "Ora/Glucosio",
+      "time": "Display numerico",
       "glucose": "Glucosio",
       "ampm": "AM/PM",
       "message": "Messaggio scorrevole",

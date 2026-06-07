@@ -72,6 +72,11 @@
     "save_to_file": "Zapisz do pliku",
     "read_from_file": "Wczytaj z pliku",
     "ampm_note": "Wskaźnik AM/PM jest widoczny tylko w formacie 12-godzinnym (w Ustawieniach).",
+    "display_schedule": {
+      "title": "Harmonogram wyświetlania",
+      "description": "Określ, co pojawia się na wyświetlaczu i jak długo. Sloty przełączają się po kolei. Pojedynczy slot czasu oznacza, że zegar jest zawsze widoczny.",
+      "add_slot": "+ Dodaj slot"
+    },
     "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
     "disable_dots_breathe": "Wyłącz pulsujące kropki godziny",
     "editor_aria": "Edytor ekranu 128×128",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi wyłączone",
       "weather": "Pogoda",
       "moon": "Księżyc",
-      "time": "Czas/Glukoza",
+      "time": "Wyświetlacz cyfr",
       "glucose": "Glukoza",
       "ampm": "AM/PM",
       "message": "Przewijany komunikat",

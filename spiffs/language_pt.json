@@ -72,6 +72,11 @@
     "save_to_file": "Guardar em ficheiro",
     "read_from_file": "Ler de ficheiro",
     "ampm_note": "O indicador AM/PM só é visível com formato de 12 horas (em Definições).",
+    "display_schedule": {
+      "title": "Agenda de exibição",
+      "description": "Defina o que aparece no visor e por quanto tempo. Os intervalos alternam em ordem. Um único intervalo de hora significa que o relógio é sempre exibido.",
+      "add_slot": "+ Adicionar intervalo"
+    },
     "show_leading_zero": "Mostrar 0 para hora de um dígito",
     "disable_dots_breathe": "Desativar pontos de hora pulsantes",
     "editor_aria": "Editor de ecrã 128×128",
@@ -90,7 +95,7 @@
       "wifi_off": "WiFi desligado",
       "weather": "Meteorologia",
       "moon": "Lua",
-      "time": "Hora/Glicose",
+      "time": "Exibição de dígitos",
       "glucose": "Glicose",
       "ampm": "AM/PM",
       "message": "Mensagem deslizante",
