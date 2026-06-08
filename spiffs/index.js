@@ -3663,6 +3663,42 @@ function setupScreenSection() {
         canvas.addEventListener('pointerup', onScreenPointerUp);
         canvas.addEventListener('pointercancel', onScreenPointerUp);
         canvas.addEventListener('pointerleave', clearScreenCanvasPointer);
+
+        canvas.addEventListener('keydown', (e) => {
+            const selectedId = window.screenEditor.selectedId;
+            if (!selectedId) return;
+
+            const nudge = e.shiftKey ? 10 : 1;
+            const profile = getProfileObj(window.screenEditor.mode);
+            if (!profile) return;
+            const elem = ensureElementInProfile(profile, selectedId);
+
+            let changed = false;
+            if (e.key === 'ArrowLeft') {
+                elem.x = clamp(elem.x - nudge, 0, SCREEN_SIZE - 1);
+                changed = true;
+            } else if (e.key === 'ArrowRight') {
+                elem.x = clamp(elem.x + nudge, 0, SCREEN_SIZE - 1);
+                changed = true;
+            } else if (e.key === 'ArrowUp') {
+                const visualY = layoutYToVisualY(elem.y, selectedId);
+                const newVisualY = clamp(visualY - nudge, 0, SCREEN_SIZE - 1);
+                elem.y = visualYToLayoutY(newVisualY, selectedId);
+                changed = true;
+            } else if (e.key === 'ArrowDown') {
+                const visualY = layoutYToVisualY(elem.y, selectedId);
+                const newVisualY = clamp(visualY + nudge, 0, SCREEN_SIZE - 1);
+                elem.y = visualYToLayoutY(newVisualY, selectedId);
+                changed = true;
+            }
+
+            if (changed) {
+                e.preventDefault();
+                renderScreenCanvas();
+                renderScreenOptions();
+                updateScreenStatusLine();
+            }
+        });
     }
 
     renderScreenPalette();
@@ -4661,6 +4697,11 @@ function beginDrag(id, pointerEvent, fromPalette) {
 function onScreenPointerDown(e) {
     if (window.screenEditor.dragging) return;
     trackScreenCanvasPointer(e);
+
+    // Focus the canvas to enable keyboard nudge
+    const canvas = el('screenCanvas');
+    if (canvas) canvas.focus();
+
     const target = e.target && e.target.closest ? e.target.closest('.screen-element') : null;
     if (!target) {
         window.screenEditor.selectedId = null;
