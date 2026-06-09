@@ -535,69 +535,79 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Optimization: Use cached elements if available, otherwise query and cache them
+    // Optimization: Use cached elements with pre-parsed keys if available
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = Array.from(document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]'))
+            .map(el => ({
+                el,
+                key: el.dataset.i18n,
+                placeholderKey: el.dataset.i18nPlaceholder,
+                ariaLabelKey: el.dataset.i18nAriaLabel
+            }));
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
+    i18nElementsCache.forEach(item => {
+        const { el, key, placeholderKey, ariaLabelKey } = item;
+
+        if (key) {
+            const translation = getNestedTranslation(trans, key);
             // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
+            if (translation && el.innerHTML !== translation) {
+                el.innerHTML = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+        if (placeholderKey) {
+            const translation = getNestedTranslation(trans, placeholderKey);
             // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
+            if (translation && el.placeholder !== translation) {
+                el.placeholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
+        if (ariaLabelKey) {
+            const translation = getNestedTranslation(trans, ariaLabelKey);
+            if (translation && el.getAttribute('aria-label') !== translation) {
+                el.setAttribute('aria-label', translation);
             }
         }
     });
 
+    // Optimization: Hoist frequent lookups outside loops
+    const showPasswordLabel = getNestedTranslation(trans, 'common.show_password');
+    const hidePasswordLabel = getNestedTranslation(trans, 'common.hide_password');
+
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = Array.from(document.querySelectorAll('.password-toggle'))
+            .map(btn => ({ btn, input: btn.previousElementSibling }));
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
-        if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
+    passwordTogglesCache.forEach(item => {
+        if (item.input) {
+            const translation = item.input.type === 'password' ? showPasswordLabel : hidePasswordLabel;
             if (translation) {
-                button.setAttribute('aria-label', translation);
+                item.btn.setAttribute('aria-label', translation);
             }
         }
     });
 
     // Update token tooltips and ARIA labels after language change
-    tokenCodesCache = null;
-    document.querySelectorAll('.token-code').forEach(token => updateTokenButtonTooltip(token));
+    if (!tokenCodesCache) {
+        tokenCodesCache = document.querySelectorAll('.token-code');
+    }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+    tokenCodesCache.forEach(token => updateTokenButtonTooltip(token, insertLabel));
 
     // Update font sample ARIA labels after language change
     if (!fontSamplesCache) {
-        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+        fontSamplesCache = Array.from(document.querySelectorAll('.font-sample-box'))
+            .map(box => ({ box, nameEl: box.querySelector('.font-sample-name') }));
     }
-    fontSamplesCache.forEach(box => {
-        const nameEl = box.querySelector('.font-sample-name');
-        if (nameEl) {
-            const fontName = nameEl.textContent.trim();
-            const selectFontTemplate = getNestedTranslation(trans, 'common.select_font') || 'Select {name} font';
-            box.setAttribute('aria-label', selectFontTemplate.replace('{name}', fontName));
+    const selectFontTemplate = getNestedTranslation(trans, 'common.select_font') || 'Select {name} font';
+    fontSamplesCache.forEach(item => {
+        if (item.nameEl) {
+            const fontName = item.nameEl.textContent.trim();
+            item.box.setAttribute('aria-label', selectFontTemplate.replace('{name}', fontName));
         }
     });
 
@@ -606,12 +616,13 @@ async function translate(lang) {
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        languageOptionsCache = Array.from(document.querySelectorAll('.language-option'))
+            .map(option => ({ option, lang: option.getAttribute('data-lang') }));
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(item => {
+        const isSelected = item.lang === effectiveLang;
+        item.option.classList.toggle('is-active', isSelected);
+        item.option.setAttribute('aria-selected', isSelected.toString());
     });
 
         const hash = window.location.hash.substring(1);
@@ -2862,12 +2873,12 @@ function getTokenCode(btn) {
     return btn.dataset.token || btn.querySelector('.token-code-label')?.textContent || btn.textContent.trim();
 }
 
-function updateTokenButtonTooltip(btn) {
+function updateTokenButtonTooltip(btn, insertLabel) {
     const code = getTokenCode(btn);
     const meta = TOKEN_HELP[code];
     const trans = translations[currentLanguage] || translations.en;
-    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-    btn.setAttribute('aria-label', `${insertLabel} ${code}`);
+    const effectiveInsertLabel = insertLabel ?? (getNestedTranslation(trans, 'common.insert') || 'Insert');
+    btn.setAttribute('aria-label', `${effectiveInsertLabel} ${code}`);
     if (!meta) return;
     const description = getNestedTranslation(trans, meta.i18nKey) || '';
     const exampleEl = btn.querySelector('.token-tooltip-example');
