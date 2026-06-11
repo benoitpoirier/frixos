@@ -6,3 +6,6 @@ main/include/config.h
 
 # Environment file with API keys (copy from env.example)
 .env
+
+#No build
+*.bin

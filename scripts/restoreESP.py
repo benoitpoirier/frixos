@@ -1,0 +1,1 @@
+esptool -p /dev/ttyUSB0 -b 921600 write-flash 0x000000 backup_esp32_8MB.bin
