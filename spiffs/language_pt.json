@@ -102,6 +102,9 @@
     "digit_label_width": "Largura (px)",
     "show_leading_zero": "Mostrar 0 para hora de um dígito",
     "disable_dots_breathe": "Desativar pontos de hora pulsantes",
+    "weather_anim": "Animar ícone do tempo",
+    "weather_anim_speed": "Ciclo de animação (segundos)",
+    "weather_anim_amp": "Amplitude de animação (1–7)",
     "editor_aria": "Editor de ecrã 128×128",
     "status_none_label": "<Nenhum>",
     "status_selected_size": "Selecionado: {name} @ ({x},{y}) tamanho ({w},{h})",
@@ -146,7 +149,10 @@
       "show_leading_zero": "Mostrar 0 para hora de um dígito",
       "disable_dots_breathe": "Desativar efeito de respiração dos pontos de hora",
       "show_grid": "Mostrar grelha",
-      "mirror": "Espelhar ecrã"
+      "mirror": "Espelhar ecrã",
+      "weather_anim": "Animar ícone do tempo",
+      "weather_anim_speed": "Ciclo de animação (segundos)",
+      "weather_anim_amp": "Amplitude de animação (1–7)"
     },
     "day": {
       "title": "Definições do dia",

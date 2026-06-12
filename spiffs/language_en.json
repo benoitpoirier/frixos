@@ -35,8 +35,7 @@
       "static_nm": "Subnet Mask",
       "static_dns1": "DNS Server 1",
       "static_dns2": "DNS Server 2",
-      "optional": "(optional)",
-      "static_dns_label": "DNS Servers"
+      "optional": "(optional)"
     },
     "wifi": {
       "available_networks": "Available WiFi Networks",
@@ -47,12 +46,6 @@
       "signal": "Signal strength",
       "secure": "Secure",
       "open": "Open"
-    },
-    "regional": {
-      "title": "Regional Settings"
-    },
-    "autoupdate": {
-      "title": "Automatic Update"
     }
   },
   "screen": {
@@ -112,6 +105,9 @@
     "digit_label_width": "Width (px)",
     "show_leading_zero": "Show 0 for single digit hour",
     "disable_dots_breathe": "Disable breathing time dots",
+    "weather_anim": "Animate weather icon",
+    "weather_anim_speed": "Animation cycle (seconds)",
+    "weather_anim_amp": "Animation amplitude (1–7)",
     "editor_aria": "128x128 screen editor",
     "status_none_label": "<None>",
     "status_selected_size": "Selected: {name} @ ({x},{y}) size ({w},{h})",
@@ -153,7 +149,10 @@
       "rotation": "Display Rotation",
       "show_scroll": "Show scrolling information message",
       "show_grid": "Show grid",
-      "mirror": "Mirror Display"
+      "mirror": "Mirror Display",
+      "weather_anim": "Animate weather icon",
+      "weather_anim_speed": "Animation cycle (seconds)",
+      "weather_anim_amp": "Animation amplitude (1–7)"
     },
     "day": {
       "title": "Day Settings",

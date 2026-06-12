@@ -109,6 +109,9 @@
     "digit_label_width": "Breite (px)",
     "show_leading_zero": "0 für einstellige Stunde anzeigen",
     "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
+    "weather_anim": "Wetter-Icon animieren",
+    "weather_anim_speed": "Animationszyklus (Sekunden)",
+    "weather_anim_amp": "Animationsamplitude (1–7)",
     "editor_aria": "128×128-Bildschirm-Editor",
     "status_none_label": "<Keine>",
     "status_selected_size": "Ausgewählt: {name} @ ({x},{y}) Größe ({w},{h})",
@@ -153,7 +156,10 @@
       "show_leading_zero": "0 für einstellige Stunde anzeigen",
       "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
       "show_grid": "Raster anzeigen",
-      "mirror": "Display spiegeln"
+      "mirror": "Display spiegeln",
+      "weather_anim": "Wetter-Icon animieren",
+      "weather_anim_speed": "Animationszyklus (Sekunden)",
+      "weather_anim_amp": "Animationsamplitude (1–7)"
     },
     "day": {
       "title": "Tag-Einstellungen",

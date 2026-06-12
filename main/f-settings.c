@@ -80,6 +80,9 @@
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
+ * - p64 = weather_anim (Weather icon infinity animation, 0 or 1)
+ * - p65 = weather_anim_speed (Animation cycle duration in seconds, 2-30)
+ * - p66 = weather_anim_amp (Animation amplitude multiplier, 1-7)
  * - p42 = pwm_frequency (PWM frequency in Hz, range 10-300000)
  * - p43 = max_power (Max power, range 1-1023)
  *
@@ -668,7 +671,7 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "advanced") == 0)
         {
-            // p01-p24, p42, p43, p46, p47, p50, p55, p56
+            // p01-p24, p42, p43, p46, p47, p50, p55, p56  (p64/p65/p66 handled separately, outside uint64_t mask)
             for (int i = 1; i <= 24; i++) mask |= (1ULL << i);
             mask |= (1ULL << 42) | (1ULL << 43) | (1ULL << 46) |
                     (1ULL << 47) | (1ULL << 50) | (1ULL << 55) | (1ULL << 56);
@@ -831,6 +834,18 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 51)) cJSON_AddNumberToObject(root, "p51", eeprom_glucose_high);
     if (mask & (1ULL << 52)) cJSON_AddNumberToObject(root, "p52", eeprom_glucose_low);
     if (mask & (1ULL << 53)) cJSON_AddNumberToObject(root, "p53", eeprom_glucose_unit);
+
+    // p64/p65/p66 are outside the uint64_t mask range — include for full fetch, advanced group, or explicit param request
+    bool include_anim = (mask == ~0ULL ||
+                         strcmp(group_local, "advanced") == 0 ||
+                         strstr(params_local, "p64") != NULL ||
+                         strstr(params_local, "p65") != NULL ||
+                         strstr(params_local, "p66") != NULL);
+    if (include_anim) {
+        cJSON_AddNumberToObject(root, "p64", eeprom_weather_anim);
+        cJSON_AddNumberToObject(root, "p65", eeprom_weather_anim_speed);
+        cJSON_AddNumberToObject(root, "p66", eeprom_weather_anim_amp);
+    }
 
     // Convert to string and send response
     char *json_str = cJSON_PrintUnformatted(root);
@@ -1003,6 +1018,18 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p50 dots_breathe */
     if ((item = cJSON_GetObjectItem(root, "p50")) && cJSON_IsNumber(item))
         CHECK_RANGE("dots_breathe", item->valueint, 0, 1);
+
+    /* p64 weather_anim */
+    if ((item = cJSON_GetObjectItem(root, "p64")) && cJSON_IsNumber(item))
+        CHECK_RANGE("weather_anim", item->valueint, 0, 1);
+
+    /* p65 weather_anim_speed */
+    if ((item = cJSON_GetObjectItem(root, "p65")) && cJSON_IsNumber(item))
+        CHECK_RANGE("weather_anim_speed", item->valueint, 2, 30);
+
+    /* p66 weather_anim_amp */
+    if ((item = cJSON_GetObjectItem(root, "p66")) && cJSON_IsNumber(item))
+        CHECK_RANGE("weather_anim_amp", item->valueint, 1, 7);
 
     /* p39 update_firmware */
     if ((item = cJSON_GetObjectItem(root, "p39")) && cJSON_IsNumber(item))
@@ -1940,6 +1967,51 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         else
         {
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dots_breathe value: %d, must be 0 or 1", breathe_value);
+        }
+    }
+
+    /* p64 weather_anim */
+    cJSON *weather_anim = cJSON_GetObjectItem(root, "p64");
+    if (cJSON_IsNumber(weather_anim))
+    {
+        int anim_value = weather_anim->valueint;
+        if (anim_value >= 0 && anim_value <= 1)
+        {
+            eeprom_weather_anim = (uint8_t)anim_value;
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid weather_anim value: %d, must be 0 or 1", anim_value);
+        }
+    }
+
+    /* p65 weather_anim_speed */
+    cJSON *weather_anim_speed = cJSON_GetObjectItem(root, "p65");
+    if (cJSON_IsNumber(weather_anim_speed))
+    {
+        int speed_value = weather_anim_speed->valueint;
+        if (speed_value >= 2 && speed_value <= 30)
+        {
+            eeprom_weather_anim_speed = (uint8_t)speed_value;
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid weather_anim_speed value: %d, must be 2-30", speed_value);
+        }
+    }
+
+    /* p66 weather_anim_amp */
+    cJSON *weather_anim_amp = cJSON_GetObjectItem(root, "p66");
+    if (cJSON_IsNumber(weather_anim_amp))
+    {
+        int amp_value = weather_anim_amp->valueint;
+        if (amp_value >= 1 && amp_value <= 7)
+        {
+            eeprom_weather_anim_amp = (uint8_t)amp_value;
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid weather_anim_amp value: %d, must be 1-7", amp_value);
         }
     }
 

@@ -1479,6 +1479,9 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p46 = wifi_start (WiFi Active Hours Start, 0-23)
  * - p47 = wifi_end (WiFi Active Hours End, 0-23)
  * - p50 = dots_breathe (Disable breathing time dots)
+ * - p64 = weather_anim (Weather icon infinity animation, 0 or 1)
+ * - p65 = weather_anim_speed (Animation cycle duration in seconds, 2-30)
+ * - p66 = weather_anim_amp (Animation amplitude multiplier, 1-7)
  * 
  * Integration Settings:
  * - p25 = eeprom_ha_url (Home Assistant URL)
@@ -1664,6 +1667,14 @@ function handleFormSubmit(e, formId) {
         
         const maxPowerEl = getFieldInForm('max_power');
         if (maxPowerEl && addIfChanged(formData, 'p43', parseInt(maxPowerEl.value) || 0, window.settings.p43)) changedCount++;
+
+        const weatherAnimEl = getFieldInForm('weather_anim');
+        if (weatherAnimEl && addIfChanged(formData, 'p64', weatherAnimEl.checked ? 1 : 0, window.settings.p64)) changedCount++;
+
+        const weatherAnimSpeedEl = getFieldInForm('weather_anim_speed');
+        if (weatherAnimSpeedEl && addIfChanged(formData, 'p65', parseInt(weatherAnimSpeedEl.value) || 8, window.settings.p65)) changedCount++;
+        const weatherAnimAmpEl = getFieldInForm('weather_anim_amp');
+        if (weatherAnimAmpEl && addIfChanged(formData, 'p66', parseInt(weatherAnimAmpEl.value) || 1, window.settings.p66)) changedCount++;
     }
 
     // Integrations form fields (integrationsForm)
@@ -4073,7 +4084,7 @@ async function fetchScreenLayout() {
     try {
         await refreshScreenLayoutSelect();
         const [settingsResp, response] = await Promise.all([
-            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58,p59'),
+            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58,p59,p64,p65,p66'),
             fetch('/api/screen')
         ]);
         if (settingsResp.ok) {
@@ -4102,12 +4113,24 @@ async function fetchScreenLayout() {
 async function saveScreenTimeDisplaySettings() {
     const leading = el('screen_show_leading_zero');
     const dots = el('screen_dots_breathe');
+    const weatherAnim = el('screen_weather_anim');
+    const weatherAnimSpeed = el('screen_weather_anim_speed');
     const scheduleList = el('display-schedule-list');
     const auxScheduleList = el('display-schedule-aux-list');
 
     const formData = {};
     if (leading) formData.p24 = leading.checked ? 1 : 0;
     if (dots) formData.p50 = dots.checked ? 1 : 0;
+    if (weatherAnim) formData.p64 = weatherAnim.checked ? 1 : 0;
+    if (weatherAnimSpeed) {
+        const v = parseInt(weatherAnimSpeed.value, 10);
+        if (!isNaN(v) && v >= 2 && v <= 30) formData.p65 = v;
+    }
+    const weatherAnimAmp = el('screen_weather_anim_amp');
+    if (weatherAnimAmp) {
+        const v = parseInt(weatherAnimAmp.value, 10);
+        if (!isNaN(v) && v >= 1 && v <= 7) formData.p66 = v;
+    }
     if (scheduleList) {
         const newSched = serializeDisplaySchedule('display-schedule-list');
         if (newSched !== (window.settings.p58 || '')) {
@@ -4565,6 +4588,50 @@ function renderScreenOptions() {
         breatheRow.appendChild(breatheLabel);
         opt.appendChild(breatheRow);
 
+        const weatherAnimRow = document.createElement('div');
+        weatherAnimRow.className = 'checkbox-container';
+        const weatherAnimInput = document.createElement('input');
+        weatherAnimInput.type = 'checkbox';
+        weatherAnimInput.id = 'screen_weather_anim';
+        weatherAnimInput.checked = !!(window.settings && window.settings.p64);
+        const weatherAnimLabel = document.createElement('label');
+        weatherAnimLabel.htmlFor = 'screen_weather_anim';
+        weatherAnimLabel.textContent = getNestedTranslation(trans, 'screen.weather_anim')
+            || 'Animate weather icon';
+        weatherAnimRow.appendChild(weatherAnimInput);
+        weatherAnimRow.appendChild(weatherAnimLabel);
+        opt.appendChild(weatherAnimRow);
+
+        const weatherAnimSpeedRow = document.createElement('div');
+        weatherAnimSpeedRow.className = 'form-group';
+        const weatherAnimSpeedLabel = document.createElement('label');
+        weatherAnimSpeedLabel.textContent = getNestedTranslation(trans, 'screen.weather_anim_speed')
+            || 'Animation cycle (seconds)';
+        const weatherAnimSpeedInput = document.createElement('input');
+        weatherAnimSpeedInput.type = 'number';
+        weatherAnimSpeedInput.id = 'screen_weather_anim_speed';
+        weatherAnimSpeedInput.min = '2';
+        weatherAnimSpeedInput.max = '30';
+        weatherAnimSpeedInput.value = (window.settings && window.settings.p65 != null) ? window.settings.p65 : 8;
+        weatherAnimSpeedRow.appendChild(weatherAnimSpeedLabel);
+        weatherAnimSpeedRow.appendChild(weatherAnimSpeedInput);
+        opt.appendChild(weatherAnimSpeedRow);
+
+        const weatherAnimAmpRow = document.createElement('div');
+        weatherAnimAmpRow.className = 'form-group';
+        const weatherAnimAmpLabel = document.createElement('label');
+        weatherAnimAmpLabel.textContent = getNestedTranslation(trans, 'screen.weather_anim_amp')
+            || 'Animation amplitude (1-7)';
+        const weatherAnimAmpInput = document.createElement('input');
+        weatherAnimAmpInput.type = 'number';
+        weatherAnimAmpInput.id = 'screen_weather_anim_amp';
+        weatherAnimAmpInput.min = '1';
+        weatherAnimAmpInput.max = '7';
+        weatherAnimAmpInput.value = (window.settings && window.settings.p66 != null) ? window.settings.p66 : 1;
+        weatherAnimAmpRow.appendChild(weatherAnimAmpLabel);
+        weatherAnimAmpRow.appendChild(weatherAnimAmpInput);
+        opt.appendChild(weatherAnimAmpRow);
+
         appendDisplayScheduleSection(opt, {
             listId: 'display-schedule-list',
             titleKey: 'screen.display_schedule.title',
@@ -4919,6 +4986,13 @@ function updateDimmingModeSections() {
     if (timeSection) timeSection.style.display = mode === 2 ? '' : 'none';
 }
 
+function updateWeatherAnimSpeedVisibility() {
+    const cb = el('weather_anim');
+    document.querySelectorAll('.weather-anim-speed-group').forEach(group => {
+        group.classList.toggle('hidden-field', !cb || !cb.checked);
+    });
+}
+
 function setupAdvancedSection() {
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {
@@ -4933,6 +5007,11 @@ function setupAdvancedSection() {
         const dimModeSelect = el('dim_mode');
         if (dimModeSelect) {
             dimModeSelect.addEventListener('change', updateDimmingModeSections);
+        }
+
+        const weatherAnimCb = el('weather_anim');
+        if (weatherAnimCb) {
+            weatherAnimCb.addEventListener('change', updateWeatherAnimSpeedVisibility);
         }
 
         // Setup message character counter and interactive tokens
@@ -5003,6 +5082,10 @@ function setupAdvancedSection() {
         if (el('brightness_LED1') && window.settings.p23 && window.settings.p23[1] !== undefined) el('brightness_LED1').value = window.settings.p23[1];
         if (el('pwm_frequency') && window.settings.p42 !== undefined) el('pwm_frequency').value = window.settings.p42 || 200;
         if (el('max_power') && window.settings.p43 !== undefined) el('max_power').value = window.settings.p43 || 1023;
+        if (el('weather_anim') && window.settings.p64 !== undefined) el('weather_anim').checked = !!window.settings.p64;
+        if (el('weather_anim_speed') && window.settings.p65 !== undefined) el('weather_anim_speed').value = window.settings.p65 || 10;
+        if (el('weather_anim_amp') && window.settings.p66 !== undefined) el('weather_anim_amp').value = window.settings.p66 || 2;
+        updateWeatherAnimSpeedVisibility();
     }
 }
 

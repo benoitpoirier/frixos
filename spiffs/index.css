@@ -1162,6 +1162,17 @@ textarea[aria-invalid="true"] {
     animation: fadeIn 0.5s ease-in-out;
 }
 
+/* Conditional field visibility */
+.hidden-field {
+    display: none !important;
+}
+
+/* Weather animation speed — indented below checkbox */
+.weather-anim-speed-group {
+    margin-left: 26px;
+    margin-top: -4px;
+}
+
 /* Buttons */
 .button {
     background-color: var(--primary-color);
