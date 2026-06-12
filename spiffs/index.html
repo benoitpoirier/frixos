@@ -159,6 +159,18 @@
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
                         </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="weather_anim" name="weather_anim">
+                            <label for="weather_anim" data-i18n="advanced.display.weather_anim">Animate weather icon (∞)</label>
+                        </div>
+                        <div class="form-group weather-anim-speed-group">
+                            <label for="weather_anim_speed" data-i18n="advanced.display.weather_anim_speed">Animation cycle (seconds)</label>
+                            <input type="number" id="weather_anim_speed" name="weather_anim_speed" min="2" max="30" value="10">
+                        </div>
+                        <div class="form-group weather-anim-speed-group">
+                            <label for="weather_anim_amp" data-i18n="advanced.display.weather_anim_amp">Animation amplitude (1–7)</label>
+                            <input type="number" id="weather_anim_amp" name="weather_anim_amp" min="1" max="7" value="2">
+                        </div>
                     </div>
                 </div>
 

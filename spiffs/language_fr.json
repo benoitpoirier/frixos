@@ -88,6 +88,9 @@
     "digit_label_width": "Largeur (px)",
     "show_leading_zero": "Afficher 0 pour les heures à un chiffre",
     "disable_dots_breathe": "Désactiver les points d'heure pulsants",
+    "weather_anim": "Animer l'icône météo",
+    "weather_anim_speed": "Durée d'un cycle d'animation (secondes)",
+    "weather_anim_amp": "Amplitude d'animation (1–7)",
     "editor_aria": "Éditeur d'écran 128×128",
     "status_none_label": "<Aucun>",
     "status_selected_size": "Sélectionné : {name} @ ({x},{y}) taille ({w},{h})",
@@ -132,7 +135,10 @@
       "show_leading_zero": "Afficher 0 pour les heures à un chiffre",
       "disable_dots_breathe": "Désactiver l'effet de respiration des points d'heure",
       "show_grid": "Afficher la grille",
-      "mirror": "Miroir de l'affichage"
+      "mirror": "Miroir de l'affichage",
+      "weather_anim": "Animer l'icône météo",
+      "weather_anim_speed": "Durée d'un cycle (secondes)",
+      "weather_anim_amp": "Amplitude d'animation (1–7)"
     },
     "day": {
       "title": "Paramètres jour",

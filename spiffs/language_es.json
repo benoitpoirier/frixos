@@ -92,6 +92,9 @@
     "digit_label_width": "Ancho (px)",
     "show_leading_zero": "Mostrar 0 para hora de un solo dígito",
     "disable_dots_breathe": "Desactivar puntos de hora pulsantes",
+    "weather_anim": "Animar icono de tiempo",
+    "weather_anim_speed": "Ciclo de animación (segundos)",
+    "weather_anim_amp": "Amplitud de animación (1–7)",
     "editor_aria": "Editor de pantalla 128×128",
     "status_none_label": "<Ninguno>",
     "status_selected_size": "Seleccionado: {name} @ ({x},{y}) tamaño ({w},{h})",
@@ -136,7 +139,10 @@
       "show_leading_zero": "Mostrar 0 para hora de un solo dígito",
       "disable_dots_breathe": "Desactivar efecto de respiración de los puntos de hora",
       "show_grid": "Mostrar cuadrícula",
-      "mirror": "Reflejar Pantalla"
+      "mirror": "Reflejar Pantalla",
+      "weather_anim": "Animar icono de tiempo",
+      "weather_anim_speed": "Ciclo de animación (segundos)",
+      "weather_anim_amp": "Amplitud de animación (1–7)"
     },
     "day": {
       "title": "Configuración Diurna",

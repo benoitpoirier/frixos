@@ -20,6 +20,7 @@ void startup_display(void);
 void display_changed(void);
 void show_qr_code(void);
 void display_digit(int position, int digit);
+void display_apply_weather_anim(void);
 void display_task(void *pvParameters);
 void replace_placeholders(const char *input, char* output, size_t output_size);
 void set_scroll_message(const char *message);

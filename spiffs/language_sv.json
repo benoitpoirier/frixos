@@ -88,6 +88,9 @@
     "digit_label_width": "Bredd (px)",
     "show_leading_zero": "Visa 0 för ensiffrig timme",
     "disable_dots_breathe": "Inaktivera pulserande tidpunkter",
+    "weather_anim": "Animera väder-ikon",
+    "weather_anim_speed": "Animationscykel (sekunder)",
+    "weather_anim_amp": "Animationsamplitud (1–7)",
     "editor_aria": "128×128-skärmredigerare",
     "status_none_label": "<Ingen>",
     "status_selected_size": "Vald: {name} @ ({x},{y}) storlek ({w},{h})",
@@ -132,7 +135,10 @@
       "show_leading_zero": "Visa 0 för ensiffrig timme",
       "disable_dots_breathe": "Inaktivera andningseffekt för tidsklocka",
       "show_grid": "Visa rutnät",
-      "mirror": "Spegla display"
+      "mirror": "Spegla display",
+      "weather_anim": "Animera väder-ikon",
+      "weather_anim_speed": "Animationscykel (sekunder)",
+      "weather_anim_amp": "Animationsamplitud (1–7)"
     },
     "day": {
       "title": "Daginställningar",

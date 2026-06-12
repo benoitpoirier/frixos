@@ -113,6 +113,12 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_mgdl = NULL,
          *img_mgdl_aux = NULL;
 
+// Weather icon infinity (∞) animation state
+static lv_timer_t *weather_anim_timer = NULL;
+static uint32_t    anim_start_ms      = 0; // lv_tick_get() value when animation started
+static int16_t     anim_base_x        = 0;
+static int16_t     anim_base_y        = 0;
+
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 lv_obj_t *label_digit = NULL;
@@ -1451,6 +1457,12 @@ static void apply_screen_layout_positions(void)
 
   lvgl_port_lock(0);
   lv_obj_align(img_weather, LV_ALIGN_TOP_LEFT, layout_abs_x(w_weather), layout_abs_y(w_weather));
+  // Keep animation base in sync with the layout position
+  if (weather_anim_timer != NULL) {
+    anim_base_x   = (int16_t)layout_abs_x(w_weather);
+    anim_base_y   = (int16_t)layout_abs_y(w_weather);
+    anim_start_ms = lv_tick_get();
+  }
   lv_obj_align(img_moon, LV_ALIGN_TOP_LEFT, layout_abs_x(w_moon), layout_abs_y(w_moon));
   lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_level), layout_abs_y(w_glucose_level));
   lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, layout_abs_x(w_wifi), layout_abs_y(w_wifi));
@@ -1485,6 +1497,64 @@ static void handle_screen_layout_on_wifi(void)
   screen_layout_positions_live = true;
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi connected, applying screen layout positions");
   display_changed();
+}
+
+// Called from the LVGL timer handler task — already inside the LVGL context;
+// lvgl_port_lock/unlock must NOT be used here to avoid self-deadlock.
+// Traces a Lissajous 2:1 curve = horizontal infinity sign (∞).
+static void weather_anim_cb(lv_timer_t *timer)
+{
+  (void)timer;
+  // Time-based angle: position computed from real elapsed milliseconds so the
+  // animation is smooth regardless of timer jitter or period.
+  uint32_t cycle_ms = (uint32_t)eeprom_weather_anim_speed * 1000u;
+  if (cycle_ms < 2000u) cycle_ms = 2000u; // floor at 2 s
+  uint32_t elapsed_ms = lv_tick_get() - anim_start_ms;
+  float a  = (float)(elapsed_ms % (cycle_ms * 1000)) * (2.0f * (float)M_PI / (float)cycle_ms);
+  
+  float amp = (float)(eeprom_weather_anim_amp > 0 ? eeprom_weather_anim_amp : 1);
+  int16_t dx = (int16_t)roundf(5.0f * amp * sinf(a));        // base: 4px × amp
+  int16_t dy = (int16_t)roundf(1.5f * amp * sinf(3.5f * a)); // base: 1.5px × amp
+
+  // Note: lv_obj_set_style_transform_scale requires LVGL to allocate an
+  // intermediate layer buffer (~5.4 KB) on every frame, exhausting the
+  // LVGL heap on this target. Position-only animation is used instead.
+  lv_obj_set_pos(img_weather, anim_base_x + dx, anim_base_y + dy);
+}
+
+// Start, stop, or refresh the weather animation based on current eeprom settings.
+// Safe to call from any task (uses lvgl_port_lock internally).
+void display_apply_weather_anim(void)
+{
+  if (!screen_layout_positions_live)
+    return; // defer until WiFi-connected layout positions are known
+
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  const screen_widget_t *w_weather = &layout->widget[SCREEN_ELEM_WEATHER];
+
+  if (eeprom_weather_anim && weather_anim_timer == NULL) {
+    anim_base_x  = (int16_t)layout_abs_x(w_weather);
+    anim_base_y  = (int16_t)layout_abs_y(w_weather);
+    anim_start_ms = lv_tick_get();
+    lvgl_port_lock(0);
+    weather_anim_timer = lv_timer_create(weather_anim_cb, 20, NULL);
+    lvgl_port_unlock();
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather anim started (speed=%us base=%d,%d)",
+                eeprom_weather_anim_speed, anim_base_x, anim_base_y);
+  } else if (!eeprom_weather_anim && weather_anim_timer != NULL) {
+    lvgl_port_lock(0);
+    lv_timer_delete(weather_anim_timer);
+    weather_anim_timer = NULL;
+    lv_obj_set_pos(img_weather, anim_base_x, anim_base_y);
+    lvgl_port_unlock();
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather anim stopped");
+  } else if (eeprom_weather_anim && weather_anim_timer != NULL) {
+    // Speed changed or layout updated — refresh base position and reset phase
+    anim_base_x  = (int16_t)layout_abs_x(w_weather);
+    anim_base_y  = (int16_t)layout_abs_y(w_weather);
+    anim_start_ms = lv_tick_get();
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather anim refreshed (speed=%us)", eeprom_weather_anim_speed);
+  }
 }
 
 // this is the initialization needed when stuff about the display has changed
@@ -1529,12 +1599,16 @@ void display_changed(void)
   lv_image_set_src(img_weather, buf);
   lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_weather, 32, 22);
+  // Bolt Optimization: Use ADD blend mode to make the icon's black background transparent 
+  // without requiring an alpha channel or extra RAM/CPU.
+  lv_obj_set_style_blend_mode(img_weather, LV_BLEND_MODE_ADDITIVE, LV_PART_MAIN);
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
 
   find_file(buf, sizeof(buf), eeprom_font[font_index], "moon");
   lv_image_set_src(img_moon, buf);
   lv_image_set_inner_align(img_moon, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_moon, 14, 14);
+  lv_obj_set_style_blend_mode(img_moon, LV_BLEND_MODE_ADDITIVE, LV_PART_MAIN);
 
   // Load glucose icon
   find_file(buf, sizeof(buf), eeprom_font[font_index], "glucose");
@@ -1621,6 +1695,9 @@ void display_changed(void)
   {
     set_scroll_message(last_scroll_msg);
   }
+
+  // Re-apply animation state after layout change (also starts animation if enabled + layout now live)
+  display_apply_weather_anim();
 }
 
 // allow -1 to display nothing
@@ -2253,8 +2330,22 @@ void display_task(void *pvParameters)
       }
     }
 
+    // Live detection of weather animation setting changes (no reboot needed)
+    {
+      static uint8_t last_weather_anim       = 0xFF;
+      static uint8_t last_weather_anim_speed = 0xFF;
+      static uint8_t last_weather_anim_amp   = 0xFF;
+      if (eeprom_weather_anim != last_weather_anim ||
+          eeprom_weather_anim_speed != last_weather_anim_speed ||
+          eeprom_weather_anim_amp != last_weather_anim_amp) {
+        last_weather_anim       = eeprom_weather_anim;
+        last_weather_anim_speed = eeprom_weather_anim_speed;
+        last_weather_anim_amp   = eeprom_weather_anim_amp;
+        display_apply_weather_anim();
+      }
+    }
+
     // NOTE: Do NOT call lv_task_handler() here! The esp_lvgl_port creates its own
-    // task that runs lv_timer_handler. Calling it from display_task causes two tasks
     // to run the LVGL timer handler, corrupting the event list and crashing in
     // lv_event_mark_deleted when objects are deleted. See LVGL issue #6677.
 

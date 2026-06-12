@@ -97,6 +97,9 @@ extern uint8_t  eeprom_quiet_scroll;
 extern uint8_t  eeprom_quiet_weather;
 extern uint8_t  eeprom_show_leading_zero;
 extern uint8_t  eeprom_dots_breathe;  // Enable breathing effect for time dots (0=disabled, 1=enabled)
+extern uint8_t  eeprom_weather_anim;         // Weather icon infinity animation (0=off, 1=on)
+extern uint8_t  eeprom_weather_anim_speed;   // Animation cycle duration in seconds (2-30)
+extern uint8_t  eeprom_weather_anim_amp;     // Animation amplitude multiplier (1-7, 1=5px/3px)
 extern uint8_t  eeprom_color_filter[2]; // [0] = day filter, [1] = night filter
 extern uint8_t  eeprom_msg_red[2];      // [0] = day red, [1] = night red
 extern uint8_t  eeprom_msg_green[2];    // [0] = day green, [1] = night green

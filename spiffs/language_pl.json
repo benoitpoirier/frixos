@@ -88,6 +88,9 @@
     "digit_label_width": "Szerokość (px)",
     "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
     "disable_dots_breathe": "Wyłącz pulsujące kropki godziny",
+    "weather_anim": "Animacja ikony pogody",
+    "weather_anim_speed": "Czas cyklu animacji (sekundy)",
+    "weather_anim_amp": "Amplituda animacji (1–7)",
     "editor_aria": "Edytor ekranu 128×128",
     "status_none_label": "<Brak>",
     "status_selected_size": "Wybrano: {name} @ ({x},{y}) rozmiar ({w},{h})",
@@ -132,7 +135,10 @@
       "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
       "disable_dots_breathe": "Wyłącz efekt oddychania kropek czasu",
       "show_grid": "Pokaż siatkę",
-      "mirror": "Odbij wyświetlacz"
+      "mirror": "Odbij wyświetlacz",
+      "weather_anim": "Animacja ikony pogody",
+      "weather_anim_speed": "Czas cyklu (sekundy)",
+      "weather_anim_amp": "Amplituda animacji (1–7)"
     },
     "day": {
       "title": "Ustawienia dzienne",

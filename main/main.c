@@ -105,6 +105,9 @@ uint8_t eeprom_quiet_scroll = 1;
 uint8_t eeprom_quiet_weather = 1;
 uint8_t eeprom_show_leading_zero = 0;     // Show leading zero for single digit hour
 uint8_t eeprom_dots_breathe = 0;          // Disable breathing effect for time dots (0=show, 1=don't show)
+uint8_t eeprom_weather_anim = 0;          // Weather icon infinity animation (0=off, 1=on)
+uint8_t eeprom_weather_anim_speed = 10;   // Animation cycle duration in seconds (2-30)
+uint8_t eeprom_weather_anim_amp = 2;      // Animation amplitude multiplier (1-7, 1=4px/2px)
 uint8_t eeprom_color_filter[2] = {0, 0};  // [0] = day, [1] = night
 uint8_t eeprom_msg_red[2] = {255, 255};   // Default to white color for both day and night
 uint8_t eeprom_msg_green[2] = {255, 255}; // Default to white color for both day and night
@@ -144,6 +147,9 @@ static const nvs_setting_t settings_table[] = {
     {"quiet_weather", SETTING_TYPE_U8, &eeprom_quiet_weather, 0},
     {"lead_zero", SETTING_TYPE_U8, &eeprom_show_leading_zero, 0},
     {"dots_breathe", SETTING_TYPE_U8, &eeprom_dots_breathe, 0},
+    {"weather_anim", SETTING_TYPE_U8, &eeprom_weather_anim, 0},
+    {"weather_anim_sp", SETTING_TYPE_U8, &eeprom_weather_anim_speed, 0},
+    {"weather_anim_amp", SETTING_TYPE_U8, &eeprom_weather_anim_amp, 0},
     {"color_filter", SETTING_TYPE_U8, &eeprom_color_filter[0], 0},
     {"msg_red", SETTING_TYPE_U8, &eeprom_msg_red[0], 0},
     {"msg_green", SETTING_TYPE_U8, &eeprom_msg_green[0], 0},
