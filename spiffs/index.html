@@ -160,7 +160,7 @@
 
                 <div class="section">
                     <div class="section-header">
-                        <h2 data-i18n="settings.display.title">Display Settings</h2>
+                        <h2 data-i18n="advanced.display.title">Display Settings</h2>
                     </div>
                     <div class="section-content">
                         <div class="form-group">
@@ -173,8 +173,43 @@
                             </select>
                         </div>
                         <div class="checkbox-container">
+                            <input type="checkbox" id="show_grid" name="show_grid">
+                            <label for="show_grid" data-i18n="advanced.display.show_grid">Show grid</label>
+                        </div>
+                        <div class="checkbox-container">
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="sprite_anim" name="sprite_anim">
+                            <label for="sprite_anim" data-i18n="advanced.display.show_sprite">Show animated sprite instead of weather</label>
+                        </div>
+                        <div id="sprite_weather_group" style="display:none;">
+                            <div class="form-group">
+                                <label for="sprite_weather" data-i18n="advanced.display.sprite_weather">Animated weather type</label>
+                                <select id="sprite_weather" name="sprite_weather">
+                                    <option value="0" data-i18n="advanced.display.sprite_weather_auto">Auto</option>
+                                    <option value="1" data-i18n="advanced.display.sprite_weather_clearsky">Clear sky</option>
+                                    <option value="9" data-i18n="advanced.display.sprite_weather_clearsky_night">Clear sky (Night)</option>
+                                    <option value="2" data-i18n="advanced.display.sprite_weather_fair">Few clouds</option>
+                                    <option value="10" data-i18n="advanced.display.sprite_weather_fair_night">Few clouds (Night)</option>
+                                    <option value="3" data-i18n="advanced.display.sprite_weather_partlycloudy">Partly cloudy</option>
+                                    <option value="11" data-i18n="advanced.display.sprite_weather_partlycloudy_night">Partly cloudy (Night)</option>
+                                    <option value="4" data-i18n="advanced.display.sprite_weather_cloudy">Cloudy</option>
+                                    <option value="5" data-i18n="advanced.display.sprite_weather_rain">Rain</option>
+                                    <option value="6" data-i18n="advanced.display.sprite_weather_thunderstorm">Thunderstorm</option>
+                                    <option value="7" data-i18n="advanced.display.sprite_weather_snow">Snow</option>
+                                    <option value="8" data-i18n="advanced.display.sprite_weather_fog">Fog</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="sprite_wait_s" data-i18n="advanced.display.sprite_wait_s">Wait before animation (s)</label>
+                                <input type="number" id="sprite_wait_s" name="sprite_wait_s" min="0" max="255" step="1" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="sprite_cycle_s" data-i18n="advanced.display.sprite_cycle_s">Animation cycle duration (s)</label>
+                                <input type="number" id="sprite_cycle_s" name="sprite_cycle_s" min="0" max="255" step="1" value="0">
+                            </div>
                         </div>
                     </div>
                 </div>

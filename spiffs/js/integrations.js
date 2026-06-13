@@ -7,6 +7,12 @@ function updateDimmingModeSections() {
     if (timeSection) timeSection.style.display = mode === 2 ? '' : 'none';
 }
 
+function updateSpriteWeatherSection() {
+    const spriteAnim = el('sprite_anim');
+    const spriteWeatherGroup = el('sprite_weather_group');
+    if (spriteWeatherGroup) spriteWeatherGroup.style.display = spriteAnim && spriteAnim.checked ? '' : 'none';
+}
+
 // --- Location helpers (geolocation + city search) ---
 
 function locationMsg(text, cls) {
@@ -257,6 +263,7 @@ function setupAdvancedSection() {
         if (el('brightness_LED1') && window.settings.p23 && window.settings.p23[1] !== undefined) el('brightness_LED1').value = window.settings.p23[1];
         if (el('pwm_frequency') && window.settings.p42 !== undefined) el('pwm_frequency').value = window.settings.p42 || 200;
         if (el('max_power') && window.settings.p43 !== undefined) el('max_power').value = window.settings.p43 || 1023;
+        updateSpriteWeatherSection();
     }
 }
 

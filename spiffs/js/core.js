@@ -348,7 +348,7 @@ function fetchSectionParams(sectionName) {
     }
 
     const groupedUrl = mappedSection === 'settings'
-        ? '/api/settings?group=settings&params=p03,p09'
+        ? '/api/settings?group=settings&params=p03,p08,p09,p64,p65,p66,p67'
         : `/api/settings?group=${mappedSection}`;
     return fetchSettingsJson(groupedUrl, { fallbackUrl: '/api/settings' })
         .then(async (data) => {

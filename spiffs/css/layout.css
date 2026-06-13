@@ -5,6 +5,16 @@
     padding: 10px;
 }
 
+@media (max-width: 900px) {
+    .container {
+        padding: 5px;
+    }
+    .menu-item {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+}
+
 /* Header and Menu */
 .menu-container {
     display: flex;
