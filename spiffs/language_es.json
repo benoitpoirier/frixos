@@ -147,6 +147,7 @@
       "rotation": "Rotación de Pantalla",
       "show_scroll": "Mostrar mensaje de información desplazable",
       "show_weather": "Mostrar icono de pronóstico del tiempo y fase lunar",
+      "show_sprite": "Mostrar sprite animado en lugar del tiempo",
       "show_leading_zero": "Mostrar 0 para hora de un solo dígito",
       "disable_dots_breathe": "Desactivar efecto de respiración de los puntos de hora",
       "show_grid": "Mostrar cuadrícula",

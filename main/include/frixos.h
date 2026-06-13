@@ -99,6 +99,7 @@ extern uint8_t  eeprom_fahrenheit;
 extern uint8_t  eeprom_12hour;
 extern uint8_t  eeprom_quiet_scroll;
 extern uint8_t  eeprom_quiet_weather;
+extern uint8_t  eeprom_sprite_anim;
 extern uint8_t  eeprom_show_leading_zero;
 extern uint8_t  eeprom_dots_breathe;  // Enable breathing effect for time dots (0=disabled, 1=enabled)
 extern uint8_t  eeprom_color_filter[2]; // [0] = day filter, [1] = night filter

@@ -60,6 +60,7 @@
  * - p05 = nightfont (Night font)
  * - p06 = quiet_scroll (Show scrolling message)
  * - p07 = quiet_weather (Show weather forecast)
+ * - p55 = sprite_anim (Show sprite animation instead of weather)
  * - p08 = show_grid (Show grid)
  * - p09 = mirroring (Mirror display)
  * - p10 = color_filter (Day color filter)

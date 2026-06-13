@@ -150,6 +150,7 @@
       "rotation": "Display-Rotation",
       "show_scroll": "Laufende Informationsnachricht anzeigen",
       "show_weather": "Wettervorhersage-Symbol und Mondphase anzeigen",
+      "show_sprite": "Animiertes Sprite anstelle des Wetters anzeigen",
       "show_leading_zero": "0 für einstellige Stunde anzeigen",
       "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
       "show_grid": "Raster anzeigen",

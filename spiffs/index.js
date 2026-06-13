@@ -1608,6 +1608,21 @@ function handleFormSubmit(e, formId) {
         const rotationEl = getFieldInForm('rotation');
         if (rotationEl && addIfChanged(formData, 'p03', parseInt(rotationEl.value) || 0, window.settings.p03)) changedCount++;
         
+        const dayfontEl = getFieldInForm('dayfont');
+        if (dayfontEl && addIfChanged(formData, 'p04', dayfontEl.value, window.settings.p04)) changedCount++;
+        
+        const nightfontEl = getFieldInForm('nightfont');
+        if (nightfontEl && addIfChanged(formData, 'p05', nightfontEl.value, window.settings.p05)) changedCount++;
+        
+        const quietScrollEl = getFieldInForm('quiet_scroll');
+        if (quietScrollEl && addIfChanged(formData, 'p06', quietScrollEl.checked ? 1 : 0, window.settings.p06)) changedCount++;
+        
+        const quietWeatherEl = getFieldInForm('quiet_weather');
+        if (quietWeatherEl && addIfChanged(formData, 'p07', quietWeatherEl.checked ? 1 : 0, window.settings.p07)) changedCount++;
+        
+        const spriteAnimEl = getFieldInForm('sprite_anim');
+        if (spriteAnimEl && addIfChanged(formData, 'p55', spriteAnimEl.checked ? 1 : 0, window.settings.p55)) changedCount++;
+        
         const showGridEl = getFieldInForm('show_grid');
         if (showGridEl && addIfChanged(formData, 'p08', showGridEl.checked ? 1 : 0, window.settings.p08)) changedCount++;
         
@@ -4986,6 +5001,11 @@ function setupAdvancedSection() {
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
         if (el('ofs_y') && window.settings.p02 !== undefined) el('ofs_y').value = window.settings.p02 || 0;
         if (el('rotation') && window.settings.p03 !== undefined) el('rotation').value = window.settings.p03 || 0;
+        if (el('dayfont') && window.settings.p04 !== undefined) el('dayfont').value = window.settings.p04 || 'bold';
+        if (el('nightfont') && window.settings.p05 !== undefined) el('nightfont').value = window.settings.p05 || 'bold';
+        if (el('quiet_scroll') && window.settings.p06 !== undefined) el('quiet_scroll').checked = window.settings.p06;
+        if (el('quiet_weather') && window.settings.p07 !== undefined) el('quiet_weather').checked = window.settings.p07;
+        if (el('sprite_anim') && window.settings.p55 !== undefined) el('sprite_anim').checked = window.settings.p55;
         if (el('show_grid') && window.settings.p08 !== undefined) el('show_grid').checked = window.settings.p08;
         if (el('mirroring') && window.settings.p09 !== undefined) el('mirroring').checked = window.settings.p09;
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
@@ -5628,6 +5648,7 @@ function collectSystemInfo() {
         nightfont: window.screenLayout ? window.screenLayout.night_font : (window.settings ? window.settings.p05 : 'bold'),
         quiet_scroll: window.settings ? (window.settings.p06 ? 'Yes' : 'No') : 'Unknown',
         quiet_weather: window.settings ? (window.settings.p07 ? 'Yes' : 'No') : 'Unknown',
+        sprite_anim: window.settings ? (window.settings.p55 ? 'Yes' : 'No') : 'Unknown',
         show_grid: window.settings ? (window.settings.p08 ? 'Yes' : 'No') : 'Unknown',
         mirroring: window.settings ? (window.settings.p09 ? 'Yes' : 'No') : 'Unknown',
         color_filter: window.screenLayout ? window.screenLayout.day_color_filter : (window.settings ? window.settings.p10 : 0),

@@ -143,6 +143,7 @@
       "rotation": "Obrót wyświetlacza",
       "show_scroll": "Pokaż przewijaną wiadomość informacyjną",
       "show_weather": "Pokaż ikonę prognozy pogody i fazę księżyca",
+      "show_sprite": "Pokaż animowany duszek zamiast pogody",
       "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
       "disable_dots_breathe": "Wyłącz efekt oddychania kropek czasu",
       "show_grid": "Pokaż siatkę",

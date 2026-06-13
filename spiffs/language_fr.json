@@ -143,6 +143,7 @@
       "rotation": "Rotation de l'affichage",
       "show_scroll": "Afficher le message d'information défilant",
       "show_weather": "Afficher l'icône de prévisions météo et la phase lunaire",
+      "show_sprite": "Afficher l'animation de sprite au lieu de la météo",
       "show_leading_zero": "Afficher 0 pour les heures à un chiffre",
       "disable_dots_breathe": "Désactiver l'effet de respiration des points d'heure",
       "show_grid": "Afficher la grille",

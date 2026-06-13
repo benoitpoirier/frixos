@@ -143,6 +143,7 @@
       "rotation": "Rotação do ecrã",
       "show_scroll": "Mostrar mensagem de informação deslizante",
       "show_weather": "Mostrar ícone de previsão meteorológica e fase lunar",
+      "show_sprite": "Mostrar sprite animado em vez do tempo",
       "show_leading_zero": "Mostrar 0 para hora de um dígito",
       "disable_dots_breathe": "Desativar efeito de respiração dos pontos de hora",
       "show_grid": "Mostrar grelha",

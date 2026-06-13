@@ -207,6 +207,94 @@
                                 <option value="3">270°</option>
                             </select>
                         </div>
+                        <h3 data-i18n="advanced.day.title">Day Settings</h3>
+                        <div class="form-group">
+                            <label for="dayfont" data-i18n="advanced.day.font">Font</label>
+                            <select id="dayfont" name="dayfont">
+                                <option value="bold">Bold</option>
+                                <option value="light">Light</option>
+                                <option value="lcd">LCD</option>
+                                <option value="nixie">Nixie</option>
+                                <option value="robrito">Robrito</option>
+                                <option value="ficasso">Ficasso</option>
+                                <option value="lichten">Lichten</option>
+                                <option value="kablame">Kablame</option>
+                                <option value="kablamo">Kablamo</option>
+                                <option value="kaboom">Kaboom</option>
+                                <option value="user1">User1</option>
+                                <option value="user2">User2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="color_filter" data-i18n="advanced.day.color_filter">Color Filter</label>
+                            <select id="color_filter" name="color_filter">
+                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
+                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
+                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
+                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
+                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="msg_color" data-i18n="advanced.day.message_color">Message Color</label>
+                            <input type="color" id="msg_color" name="msg_color" value="#FFFFFF">
+                        </div>
+
+                        <h3 data-i18n="advanced.night.title">Night Settings</h3>
+                        <div class="form-group">
+                            <label for="nightfont" data-i18n="advanced.night.font">Font</label>
+                            <select id="nightfont" name="nightfont">
+                                <option value="bold">Bold</option>
+                                <option value="light">Light</option>
+                                <option value="lcd">LCD</option>
+                                <option value="nixie">Nixie</option>
+                                <option value="robrito">Robrito</option>
+                                <option value="ficasso">Ficasso</option>
+                                <option value="lichten">Lichten</option>
+                                <option value="kablame">Kablame</option>
+                                <option value="kablamo">Kablamo</option>
+                                <option value="kaboom">Kaboom</option>
+                                <option value="user1">User1</option>
+                                <option value="user2">User2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="night_color_filter" data-i18n="advanced.night.color_filter">Color Filter</label>
+                            <select id="night_color_filter" name="night_color_filter">
+                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
+                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
+                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
+                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
+                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="night_msg_color" data-i18n="advanced.night.message_color">Message Color</label>
+                            <input type="color" id="night_msg_color" name="night_msg_color" value="#FFFFFF">
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="quiet_scroll" name="quiet_scroll">
+                            <label for="quiet_scroll" data-i18n="advanced.display.show_scroll">Show scrolling
+                                information message</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="quiet_weather" name="quiet_weather">
+                            <label for="quiet_weather" data-i18n="advanced.display.show_weather">Show weather forecast
+                                icon and moon phase</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="sprite_anim" name="sprite_anim">
+                            <label for="sprite_anim" data-i18n="advanced.display.show_sprite">Show animated sprite instead of weather</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="show_leading_zero" name="show_leading_zero">
+                            <label for="show_leading_zero" data-i18n="advanced.display.show_leading_zero">Show 0 for
+                                single digit hour</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="dots_breathe" name="dots_breathe">
+                            <label for="dots_breathe" data-i18n="advanced.display.disable_dots_breathe">Disable breathing time dots</label>
+                        </div>
                         <div class="checkbox-container">
                             <input type="checkbox" id="show_grid" name="show_grid">
                             <label for="show_grid" data-i18n="advanced.display.show_grid">Show grid</label>

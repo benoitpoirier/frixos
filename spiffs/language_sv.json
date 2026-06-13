@@ -143,6 +143,7 @@
       "rotation": "Displayrotation",
       "show_scroll": "Visa rullande informationsmeddelande",
       "show_weather": "Visa väderprognos-ikon och månfas",
+      "show_sprite": "Visa animerad sprite istället för väder",
       "show_leading_zero": "Visa 0 för ensiffrig timme",
       "disable_dots_breathe": "Inaktivera andningseffekt för tidsklocka",
       "show_grid": "Visa rutnät",

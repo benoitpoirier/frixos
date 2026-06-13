@@ -152,6 +152,10 @@
       "y_offset": "Y Offset",
       "rotation": "Display Rotation",
       "show_scroll": "Show scrolling information message",
+      "show_weather": "Show weather forecast icon and moon phase",
+      "show_sprite": "Show animated sprite instead of weather",
+      "show_leading_zero": "Show 0 for single digit hour",
+      "disable_dots_breathe": "Disable breathing time dots",
       "show_grid": "Show grid",
       "mirror": "Mirror Display"
     },
