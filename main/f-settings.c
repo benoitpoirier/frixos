@@ -60,6 +60,7 @@
  * - p05 = nightfont (Night font)
  * - p06 = quiet_scroll (Show scrolling message)
  * - p07 = quiet_weather (Show weather forecast)
+ * - p64 = sprite_anim (Show sprite animation instead of weather icon)
  * - p08 = show_grid (Show grid)
  * - p09 = mirroring (Mirror display)
  * - p10 = color_filter (Day color filter)
@@ -107,6 +108,10 @@
  * - p61 = static_gw (Default gateway)
  * - p62 = static_nm (Subnet mask, default 255.255.255.0)
  * - p63 = static_dns (DNS servers, comma-separated e.g. "8.8.8.8,8.8.4.4")
+ *
+ * Extended Settings (p64+):
+ * - p64 = sprite_anim (0=static weather icon, 1=animated sprite)
+ * - p65 = sprite_weather (0=auto, 1-11 manual animated weather selection)
  */
 
 // Tag for logging
@@ -641,11 +646,14 @@ static const char *get_query_param(const char *uri, const char *param_name, char
 
 // Helper function to calculate a bitmask of parameters to include in JSON response.
 // Bit N corresponds to parameter pN.
-static uint64_t calculate_include_mask(const char *group, const char *params)
+static uint64_t calculate_include_mask(const char *group, const char *params, uint64_t *mask2_out)
 {
-    // If no filters specified, include everything (bits 0-63 set)
+    *mask2_out = 0;
+
+    // If no filters specified, include everything (bits 0-63 set + all extended)
     if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
     {
+        *mask2_out = ~0ULL;
         return ~0ULL;
     }
 
@@ -668,10 +676,12 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "advanced") == 0)
         {
-            // p01-p24, p42, p43, p46, p47, p50, p55, p56
+                // p01-p24, p42, p43, p46, p47, p50, p55, p56, p64, p65
             for (int i = 1; i <= 24; i++) mask |= (1ULL << i);
             mask |= (1ULL << 42) | (1ULL << 43) | (1ULL << 46) |
                     (1ULL << 47) | (1ULL << 50) | (1ULL << 55) | (1ULL << 56);
+                // p64 = sprite_anim, p65 = sprite_weather
+                *mask2_out |= 3ULL;
         }
         else if (strcmp(group, "integrations") == 0)
         {
@@ -697,6 +707,14 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
                 if (p_num >= 0 && p_num < 64)
                 {
                     mask |= (1ULL << p_num);
+                }
+                else if (p_num == 64)
+                {
+                    *mask2_out |= 1ULL; // p64 = sprite_anim
+                }
+                else if (p_num == 65)
+                {
+                    *mask2_out |= 2ULL; // p65 = sprite_weather
                 }
             }
         }
@@ -725,7 +743,8 @@ esp_err_t send_json_settings(httpd_req_t *req)
     }
 
     // Pre-calculate inclusion mask once to optimize performance from O(N*M) to O(1)
-    uint64_t mask = calculate_include_mask(group_local, params_local);
+    uint64_t mask2 = 0;
+    uint64_t mask = calculate_include_mask(group_local, params_local, &mask2);
 
     // Add parameters based on mask
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
@@ -826,6 +845,10 @@ esp_err_t send_json_settings(httpd_req_t *req)
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
     if (mask & (1ULL << 54)) cJSON_AddStringToObject(root, "p54", eeprom_ns_url);
+
+    // Extended settings (p64+)
+    if (mask2 & 1ULL) cJSON_AddNumberToObject(root, "p64", eeprom_sprite_anim);
+    if (mask2 & 2ULL) cJSON_AddNumberToObject(root, "p65", eeprom_sprite_weather);
 
     // Add Glucose Thresholds and Unit
     if (mask & (1ULL << 51)) cJSON_AddNumberToObject(root, "p51", eeprom_glucose_high);
@@ -1146,6 +1169,14 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
         CHECK_RANGE("quiet_scroll", item->valueint, 0, 1);
     if ((item = cJSON_GetObjectItem(root, "p07")) && cJSON_IsNumber(item))
         CHECK_RANGE("quiet_weather", item->valueint, 0, 1);
+
+    /* p64 sprite_anim */
+    if ((item = cJSON_GetObjectItem(root, "p64")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sprite_anim", item->valueint, 0, 1);
+
+    /* p65 sprite_weather */
+    if ((item = cJSON_GetObjectItem(root, "p65")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sprite_weather", item->valueint, 0, 11);
 
     /* p10 color_filter, p11 night_color_filter */
     if ((item = cJSON_GetObjectItem(root, "p10")) && cJSON_IsNumber(item))
@@ -2107,6 +2138,18 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(quiet_weather))
     {
         eeprom_quiet_weather = (uint8_t)quiet_weather->valueint;
+    }
+
+    cJSON *sprite_anim_item = cJSON_GetObjectItem(root, "p64");
+    if (cJSON_IsNumber(sprite_anim_item))
+    {
+        eeprom_sprite_anim = (uint8_t)sprite_anim_item->valueint;
+    }
+
+    cJSON *sprite_weather_item = cJSON_GetObjectItem(root, "p65");
+    if (cJSON_IsNumber(sprite_weather_item))
+    {
+        eeprom_sprite_weather = (uint8_t)sprite_weather_item->valueint;
     }
 
     // Process color filter setting

@@ -215,6 +215,27 @@
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
                         </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="sprite_anim" name="sprite_anim">
+                            <label for="sprite_anim" data-i18n="advanced.display.show_sprite">Show animated sprite instead of weather</label>
+                        </div>
+                        <div class="form-group" id="sprite_weather_group" style="display:none;">
+                            <label for="sprite_weather" data-i18n="advanced.display.sprite_weather">Animated weather type</label>
+                            <select id="sprite_weather" name="sprite_weather">
+                                <option value="0" data-i18n="advanced.display.sprite_weather_auto">Auto / current weather</option>
+                                <option value="1" data-i18n="advanced.display.sprite_weather_clearsky">1 Clear sky / 01d, 01n / clearsky</option>
+                                <option value="2" data-i18n="advanced.display.sprite_weather_fair">2 Fair / few clouds / 02d, 02n / fair</option>
+                                <option value="3" data-i18n="advanced.display.sprite_weather_partlycloudy">3 Partly cloudy / 03d, 03n / partlycloudy</option>
+                                <option value="4" data-i18n="advanced.display.sprite_weather_cloudy">4 Cloudy / overcast / 04d, 04n / cloudy</option>
+                                <option value="5" data-i18n="advanced.display.sprite_weather_rain">5 Rain / 09, 10 / rain</option>
+                                <option value="6" data-i18n="advanced.display.sprite_weather_thunderstorm">6 Thunderstorm / 11 / thunderstorm</option>
+                                <option value="7" data-i18n="advanced.display.sprite_weather_snow">7 Snow / sleet / 13 / snow, sleet</option>
+                                <option value="8" data-i18n="advanced.display.sprite_weather_fog">8 Fog / mist / web only</option>
+                                <option value="9" data-i18n="advanced.display.sprite_weather_clearsky_night">9 Clear sky night / moon / clearsky_night</option>
+                                <option value="10" data-i18n="advanced.display.sprite_weather_fair_night">10 Fair night / moon + few clouds / fair_night</option>
+                                <option value="11" data-i18n="advanced.display.sprite_weather_partlycloudy_night">11 Partly cloudy night / moon / partlycloudy_night</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

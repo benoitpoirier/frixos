@@ -11,6 +11,7 @@
 
 #include "frixos.h"
 #include "f-display.h"
+#include "f-sprite.h"
 #include "f-pwm.h"
 #include "f-time.h"
 #include "f-wifi.h"
@@ -100,7 +101,20 @@ static const char *month_names[9][12] = {
     {"Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"}};
 char msg_scrolling[SCROLL_MSG_LENGTH]; // scrolling message text
 double lux = 0;
-// Include the generated sprite sheet image
+extern const frixos_sprite_asset_t sprite_clearsky;
+extern const frixos_sprite_asset_t sprite_clearsky_night;
+extern const frixos_sprite_asset_t sprite_fair;
+extern const frixos_sprite_asset_t sprite_fair_night;
+extern const frixos_sprite_asset_t sprite_partlycloudy;
+extern const frixos_sprite_asset_t sprite_partlycloudy_night;
+extern const frixos_sprite_asset_t sprite_cloud;
+extern const frixos_sprite_asset_t sprite_rain;
+extern const frixos_sprite_asset_t sprite_storm;
+extern const frixos_sprite_asset_t sprite_snow;
+extern const frixos_sprite_asset_t sprite_fog;
+static frixos_sprite_t *weather_sprite = NULL; // animated weather icon sprite
+static uint8_t last_sprite_anim = 0xFF;  // detect live changes to eeprom_sprite_anim
+static uint8_t last_sprite_weather = 0xFF; // detect live changes to eeprom_sprite_weather
 lv_obj_t *img_digits_sprite = NULL,
          *img_digits_sprite_aux = NULL,
          *img_weather = NULL,
@@ -120,6 +134,81 @@ lv_obj_t *label_digit = NULL;
 lv_obj_t *label_digit_aux = NULL;
 static lv_obj_t *label_degree = NULL;
 static lv_obj_t *label_degree_aux = NULL;
+
+static bool is_currently_night_for_sprite(void)
+{
+  if (!time_valid || sunrise <= 0 || sunset <= 0)
+    return false;
+
+  time_t now = time(NULL);
+  return (now < sunrise || now >= sunset);
+}
+
+static const frixos_sprite_asset_t *get_auto_weather_sprite(void)
+{
+  const bool night_mode = is_currently_night_for_sprite();
+
+  switch (weather_icon_index)
+  {
+    case 0: return night_mode ? &sprite_clearsky_night : &sprite_clearsky;
+    case 1: return night_mode ? &sprite_fair_night : &sprite_fair;
+    case 2: return night_mode ? &sprite_partlycloudy_night : &sprite_partlycloudy;
+    case 3: return &sprite_cloud;
+    case 4: return &sprite_rain;
+    case 5: return &sprite_storm;
+    case 6: return &sprite_snow;
+    case 7: return &sprite_fog;
+    default: return &sprite_clearsky;
+  }
+}
+
+static const frixos_sprite_asset_t *get_selected_weather_sprite(void)
+{
+  switch (eeprom_sprite_weather)
+  {
+    case 0: return get_auto_weather_sprite();
+    case 1: return &sprite_clearsky;
+    case 2: return &sprite_fair;
+    case 3: return &sprite_partlycloudy;
+    case 4: return &sprite_cloud;
+    case 5: return &sprite_rain;
+    case 6: return &sprite_storm;
+    case 7: return &sprite_snow;
+    case 8: return &sprite_fog;
+    case 9: return &sprite_clearsky_night;
+    case 10: return &sprite_fair_night;
+    case 11: return &sprite_partlycloudy_night;
+    default: return get_auto_weather_sprite();
+  }
+}
+
+static void rebuild_weather_sprite_locked(void)
+{
+  const frixos_sprite_asset_t *weather_asset = get_selected_weather_sprite();
+
+  if (weather_sprite)
+  {
+    frixos_sprite_delete(weather_sprite);
+    weather_sprite = NULL;
+  }
+
+  lv_image_set_src(img_weather, &weather_asset->image);
+  lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
+  lv_obj_set_size(img_weather, 32, 32);
+  weather_sprite = frixos_sprite_create(img_weather, 32, 32, 0,
+                                        weather_asset->fps ? weather_asset->fps : FRIXOS_SPRITE_DEFAULT_FPS);
+  if (weather_sprite)
+  {
+    frixos_sprite_set_blend_mode(weather_sprite, LV_BLEND_MODE_ADDITIVE);
+    frixos_sprite_play(weather_sprite);
+  }
+  else
+  {
+    ESP_LOGW(TAG, "Failed to create weather sprite");
+  }
+
+  last_sprite_weather = eeprom_sprite_weather;
+}
 
 // Define digit width & height (adjust based on actual sprite sheet)
 #define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
@@ -1347,7 +1436,7 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
                                  layout, &aux_runner, SCREEN_ELEM_TIME_AUX);
   show_object(img_ampm, show_time_digits && eeprom_12hour);
 
-  show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
+  show_object(img_weather, w_weather->enabled && (eeprom_sprite_anim ? time_valid : (weather_valid && time_valid)));
   show_object(img_moon, w_moon->enabled && time_valid);
   show_object(label_msg, w_msg->enabled || !time_valid);
 
@@ -1557,10 +1646,22 @@ void display_changed(void)
 
   lvgl_port_lock(0);
 
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "weather");
-  lv_image_set_src(img_weather, buf);
-  lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
-  lv_obj_set_size(img_weather, 32, 22);
+  // Setup weather image object based on sprite_anim setting
+  if (eeprom_sprite_anim) {
+    rebuild_weather_sprite_locked();
+  } else {
+    // Static mode: stop sprite if running, restore static weather icon
+    if (weather_sprite) {
+      frixos_sprite_delete(weather_sprite);
+      weather_sprite = NULL;
+    }
+    find_file(buf, sizeof(buf), eeprom_font[font_index], "weather");
+    lv_image_set_src(img_weather, buf);
+    lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_size(img_weather, 32, 22);
+  }
+  last_sprite_anim = eeprom_sprite_anim;
+  last_sprite_weather = eeprom_sprite_weather;
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
 
   find_file(buf, sizeof(buf), eeprom_font[font_index], "moon");
@@ -1718,7 +1819,7 @@ void update_weather_msg(void)
   lvgl_port_lock(0);
   integration_tokens_updated = true; // signal that tokens have been updated
   const bool weather_enabled = eeprom_screen_layout.profile[font_index].widget[SCREEN_ELEM_WEATHER].enabled;
-  show_object(img_weather, weather_enabled && weather_valid && time_valid);
+  show_object(img_weather, weather_enabled && (eeprom_sprite_anim ? time_valid : (weather_valid && time_valid)));
   lvgl_port_unlock();
 }
 
@@ -2116,10 +2217,10 @@ static void update_display_content(time_t now)
 
   sync_schedule_runners();
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  const bool sprite_weather_changed = (last_sprite_weather != eeprom_sprite_weather);
   if (weather_has_updated || (timeinfo.tm_min == 1))
   {
     update_weather_msg();
-    weather_has_updated = false;
   }
 
   bool show_ampm = false;
@@ -2132,10 +2233,16 @@ static void update_display_content(time_t now)
   update_digit_label_widgets();
   show_object(img_ampm, layout_show_time_digits(layout, &primary_runner, SCREEN_ELEM_TIME) && eeprom_12hour);
 
-  lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
+  if (eeprom_sprite_anim && (weather_has_updated || sprite_weather_changed))
+    rebuild_weather_sprite_locked();
+
+  if (!eeprom_sprite_anim) lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
   lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
   lvgl_port_unlock();
+
+  if (weather_has_updated)
+    weather_has_updated = false;
 
   last_minute = timeinfo.tm_min;
 

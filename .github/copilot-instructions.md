@@ -42,17 +42,6 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 - **Prefer Position Animation**: Use `lv_obj_set_pos` or `lv_obj_set_x/y` for transformations.
 - **Fluidity & Resolution**: On a 128x128 screen, very slow movements (e.g., 1px every 2 seconds) will appear staggered. Use `roundf()` for coordinate calculation to minimize truncation artifacts.
 
-### High-Performance Sprite Animation (`f-sprite.h`)
-- **Library**: Use the custom `frixos_sprite_t` system for animated icons (weather, effects).
-- **Zero-Copy**: Sprites MUST be stored as **Raw RGB565 C-Arrays** in Flash. Avoid JPEGs for high-FPS animations to prevent CPU bottlenecks and high RAM usage from the decoder.
-- **Timing**: Animations use `esp_timer` (High Resolution Timer) instead of `lv_timer` to ensure a stable 15-30 FPS independently of the UI task's business logic.
-- **Rendering Method**: Use `lv_image_set_offset_x` on a horizontal spritesheet. Ensure the `lv_obj_t` size matches exactly ONE frame.
-- **Transparency & Blending**:
-    - Use `lv_obj_set_style_bg_opa(obj, 0, 0)` on sprite objects.
-    - For "Glow" or additive effects on black backgrounds, use `frixos_sprite_set_blend_mode(sprite, LV_BLEND_MODE_ADDITIVE)`.
-    - Opacity can be controlled globally via `frixos_sprite_set_opacity`.
-- **DMA Alignment**: The 40MHz SPI bus handles the pixel transfer via DMA. Ensure all UI updates in timer callbacks are wrapped in `lvgl_port_lock(0)`.
-
 ### UI Settings Toggling
 - **Live Updates**: Use the pattern of `static last_setting` variables within a main loop or dedicated task (like `display_task`) to detect NVS global changes and apply them dynamically (e.g., creating/deleting timers or updating UI objects) without requiring a device reboot.
 - **Conditional Visibility**: When a feature (like animation) is toggled off in the Web UI, its sub-parameters (speed, amplitude) should be hidden using the `hidden-field` CSS class in `index.html`/`index.js`.

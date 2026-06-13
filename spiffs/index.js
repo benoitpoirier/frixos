@@ -1614,6 +1614,12 @@ function handleFormSubmit(e, formId) {
         const mirroringEl = getFieldInForm('mirroring');
         if (mirroringEl && addIfChanged(formData, 'p09', mirroringEl.checked ? 1 : 0, window.settings.p09)) changedCount++;
         
+        const spriteAnimEl = getFieldInForm('sprite_anim');
+        if (spriteAnimEl && addIfChanged(formData, 'p64', spriteAnimEl.checked ? 1 : 0, window.settings.p64)) changedCount++;
+
+        const spriteWeatherEl = getFieldInForm('sprite_weather');
+        if (spriteWeatherEl && addIfChanged(formData, 'p65', parseInt(spriteWeatherEl.value) || 0, window.settings.p65)) changedCount++;
+        
         const latEl = getFieldInForm('lat');
         if (latEl && addIfChanged(formData, 'p17', latEl.value, window.settings.p17)) changedCount++;
         
@@ -4919,6 +4925,12 @@ function updateDimmingModeSections() {
     if (timeSection) timeSection.style.display = mode === 2 ? '' : 'none';
 }
 
+function updateSpriteWeatherSection() {
+    const spriteAnim = el('sprite_anim');
+    const spriteWeatherGroup = el('sprite_weather_group');
+    if (spriteWeatherGroup) spriteWeatherGroup.style.display = spriteAnim && spriteAnim.checked ? '' : 'none';
+}
+
 function setupAdvancedSection() {
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {
@@ -4933,6 +4945,11 @@ function setupAdvancedSection() {
         const dimModeSelect = el('dim_mode');
         if (dimModeSelect) {
             dimModeSelect.addEventListener('change', updateDimmingModeSections);
+        }
+
+        const spriteAnimCheckbox = el('sprite_anim');
+        if (spriteAnimCheckbox) {
+            spriteAnimCheckbox.addEventListener('change', updateSpriteWeatherSection);
         }
 
         // Setup message character counter and interactive tokens
@@ -4988,6 +5005,8 @@ function setupAdvancedSection() {
         if (el('rotation') && window.settings.p03 !== undefined) el('rotation').value = window.settings.p03 || 0;
         if (el('show_grid') && window.settings.p08 !== undefined) el('show_grid').checked = window.settings.p08;
         if (el('mirroring') && window.settings.p09 !== undefined) el('mirroring').checked = window.settings.p09;
+        if (el('sprite_anim') && window.settings.p64 !== undefined) el('sprite_anim').checked = !!window.settings.p64;
+        if (el('sprite_weather') && window.settings.p65 !== undefined) el('sprite_weather').value = String(window.settings.p65 || 0);
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
@@ -5003,6 +5022,7 @@ function setupAdvancedSection() {
         if (el('brightness_LED1') && window.settings.p23 && window.settings.p23[1] !== undefined) el('brightness_LED1').value = window.settings.p23[1];
         if (el('pwm_frequency') && window.settings.p42 !== undefined) el('pwm_frequency').value = window.settings.p42 || 200;
         if (el('max_power') && window.settings.p43 !== undefined) el('max_power').value = window.settings.p43 || 1023;
+        updateSpriteWeatherSection();
     }
 }
 
