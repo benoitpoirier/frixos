@@ -30,6 +30,6 @@
     "lv_image_decoder.h": "c"
   },
   "idf.pythonInstallPath": "c:\\Espressif\\tools\\tools\\idf-python\\3.11.2\\python.exe",
-  "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.currentSetup": "/opt/esp/idf",
   "idf.customExtraVars": {}
 }
