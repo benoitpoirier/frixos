@@ -109,6 +109,8 @@ uint8_t eeprom_quiet_scroll = 1;
 uint8_t eeprom_quiet_weather = 1;
 uint8_t eeprom_sprite_anim = 0;           // 0 = weather icon, 1 = sprite animation
 uint8_t eeprom_sprite_weather = 0;        // Animated sprite weather selection (0=auto, 1-11 manual)
+uint8_t eeprom_sprite_wait_s = 0;         // Seconds to wait before entry transition (0 = no transitions)
+uint8_t eeprom_sprite_cycle_s = 0;        // Normal cycle duration in seconds (0 = skip cycle)
 uint8_t eeprom_show_leading_zero = 0;     // Show leading zero for single digit hour
 uint8_t eeprom_dots_breathe = 0;          // Disable breathing effect for time dots (0=show, 1=don't show)
 uint8_t eeprom_color_filter[2] = {0, 0};  // [0] = day, [1] = night
@@ -150,6 +152,8 @@ static const nvs_setting_t settings_table[] = {
     {"quiet_weather", SETTING_TYPE_U8, &eeprom_quiet_weather, 0},
     {"sprite_anim", SETTING_TYPE_U8, &eeprom_sprite_anim, 0},
     {"sprite_weather", SETTING_TYPE_U8, &eeprom_sprite_weather, 0},
+    {"sprite_wait_s", SETTING_TYPE_U8, &eeprom_sprite_wait_s, 0},
+    {"sprite_cycle_s", SETTING_TYPE_U8, &eeprom_sprite_cycle_s, 0},
     {"lead_zero", SETTING_TYPE_U8, &eeprom_show_leading_zero, 0},
     {"dots_breathe", SETTING_TYPE_U8, &eeprom_dots_breathe, 0},
     {"color_filter", SETTING_TYPE_U8, &eeprom_color_filter[0], 0},

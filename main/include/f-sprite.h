@@ -15,6 +15,8 @@ typedef struct {
     uint16_t frame_height;      ///< Height of a single frame in pixels
     uint16_t total_frames;      ///< Total number of frames in the spritesheet
     uint16_t current_frame;     ///< Current active frame index
+    uint16_t loop_start;        ///< First frame of playback loop range (default 0)
+    uint16_t loop_end;          ///< Last frame of playback loop range inclusive (default total_frames-1)
     uint32_t frame_duration_ms; ///< Time between frames in milliseconds
     esp_timer_handle_t timer;   ///< Timer for high-precision frame updates
     bool is_playing;            ///< Animation status flag
@@ -28,8 +30,9 @@ typedef struct {
  * directly to LVGL APIs expecting an lv_image_dsc_t pointer.
  */
 typedef struct {
-    lv_image_dsc_t image;       ///< LVGL image descriptor for the spritesheet
-    uint8_t fps;                ///< Default transition speed between frames
+    lv_image_dsc_t image;          ///< LVGL image descriptor for the spritesheet
+    uint8_t fps;                   ///< Default transition speed between frames
+    uint8_t transition_frames;     ///< Number of entry/exit transition frames (0 = no transitions)
 } frixos_sprite_asset_t;
 
 /**
@@ -86,5 +89,14 @@ void frixos_sprite_set_frame(frixos_sprite_t *sprite, uint16_t frame);
  * @param sprite Pointer to the sprite structure
  */
 void frixos_sprite_delete(frixos_sprite_t *sprite);
+
+/**
+ * @brief Restrict the timer-driven loop to a sub-range of frames.
+ * The timer wraps at loop_end back to loop_start instead of total_frames.
+ * @param sprite Pointer to the sprite structure
+ * @param start First frame of the loop range (clamped to valid range)
+ * @param end  Last frame of the loop range inclusive (clamped to valid range)
+ */
+void frixos_sprite_set_loop_range(frixos_sprite_t *sprite, uint16_t start, uint16_t end);
 
 #endif // F_SPRITE_H

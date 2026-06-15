@@ -45,8 +45,10 @@ static void sprite_timer_cb(void *arg) {
     frixos_sprite_t *sprite = (frixos_sprite_t *)arg;
     if (!sprite || !sprite->is_playing) return;
 
-    // Calculate next frame
-    sprite->current_frame = (sprite->current_frame + 1) % sprite->total_frames;
+    // Calculate next frame within loop range
+    sprite->current_frame++;
+    if (sprite->current_frame > sprite->loop_end)
+        sprite->current_frame = sprite->loop_start;
 
     // Update LVGL object - Requires lock!
     if (lvgl_port_lock(0)) {
@@ -79,6 +81,8 @@ frixos_sprite_t* frixos_sprite_create(lv_obj_t *img_obj, uint16_t width, uint16_
     sprite->frame_height = height;
     sprite->total_frames = resolved_frames;
     sprite->current_frame = 0;
+    sprite->loop_start = 0;
+    sprite->loop_end = resolved_frames - 1;
     sprite->frame_duration_ms = 1000 / fps;
     sprite->is_playing = false;
 
@@ -165,4 +169,13 @@ void frixos_sprite_delete(frixos_sprite_t *sprite) {
     frixos_sprite_stop(sprite);
     esp_timer_delete(sprite->timer);
     free(sprite);
+}
+
+void frixos_sprite_set_loop_range(frixos_sprite_t *sprite, uint16_t start, uint16_t end) {
+    if (!sprite) return;
+    if (start >= sprite->total_frames) start = 0;
+    if (end >= sprite->total_frames) end = sprite->total_frames - 1;
+    if (start > end) end = start;
+    sprite->loop_start = start;
+    sprite->loop_end = end;
 }

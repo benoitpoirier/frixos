@@ -1619,6 +1619,12 @@ function handleFormSubmit(e, formId) {
 
         const spriteWeatherEl = getFieldInForm('sprite_weather');
         if (spriteWeatherEl && addIfChanged(formData, 'p65', parseInt(spriteWeatherEl.value) || 0, window.settings.p65)) changedCount++;
+
+        const spriteWaitEl = getFieldInForm('sprite_wait_s');
+        if (spriteWaitEl && addIfChanged(formData, 'p66', parseInt(spriteWaitEl.value) || 0, window.settings.p66)) changedCount++;
+
+        const spriteCycleEl = getFieldInForm('sprite_cycle_s');
+        if (spriteCycleEl && addIfChanged(formData, 'p67', parseInt(spriteCycleEl.value) || 0, window.settings.p67)) changedCount++;
         
         const latEl = getFieldInForm('lat');
         if (latEl && addIfChanged(formData, 'p17', latEl.value, window.settings.p17)) changedCount++;
@@ -5007,6 +5013,8 @@ function setupAdvancedSection() {
         if (el('mirroring') && window.settings.p09 !== undefined) el('mirroring').checked = window.settings.p09;
         if (el('sprite_anim') && window.settings.p64 !== undefined) el('sprite_anim').checked = !!window.settings.p64;
         if (el('sprite_weather') && window.settings.p65 !== undefined) el('sprite_weather').value = String(window.settings.p65 || 0);
+        if (el('sprite_wait_s') && window.settings.p66 !== undefined) el('sprite_wait_s').value = window.settings.p66 || 0;
+        if (el('sprite_cycle_s') && window.settings.p67 !== undefined) el('sprite_cycle_s').value = window.settings.p67 || 0;
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';

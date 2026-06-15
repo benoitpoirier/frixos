@@ -33,7 +33,7 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 5. **Language**: All comments, default labels, variable names, log messages, and inline strings in source code **must be written in English**. The only exception is the `language_*.json` translation files in `spiffs/`, which contain localized strings by design.
 6. **Logging**: Use `ESP_LOGI`, `ESP_LOGW`, `ESP_LOGE` with the `TAG` defined in each module.
 7. **Error Handling**: Use `ESP_RETURN_ON_ERROR` and `ESP_GOTO_ON_ERROR` macros for clean error propagation.
-8. **Compilation**: NEVER run `idf.py build` (or any equivalent build task/command) at the end of a request unless specifically asked by the user.
+8. **Compilation**: **NEVER** run `idf.py build` (or any equivalent build task/command) at the end of a request unless specifically asked by the user in the prompt. Do not attempt to "verify" code by building unless explicitly requested.
 
 ## 🎞 Animation & Graphics (LVGL 9)
 
@@ -45,6 +45,29 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 ### UI Settings Toggling
 - **Live Updates**: Use the pattern of `static last_setting` variables within a main loop or dedicated task (like `display_task`) to detect NVS global changes and apply them dynamically (e.g., creating/deleting timers or updating UI objects) without requiring a device reboot.
 - **Conditional Visibility**: When a feature (like animation) is toggled off in the Web UI, its sub-parameters (speed, amplitude) should be hidden using the `hidden-field` CSS class in `index.html`/`index.js`.
+
+### Weather Sprites & State Machine
+Weather icons are implemented as dynamic sprites with a phased state machine to conserve CPU and provide smooth visual transitions:
+- **Phases**: `WAIT` (Inactive, frame 0) → `ENTRY` (Transition in) → `CYCLE` (Looping) → `EXIT` (Transition out) → `WAIT`.
+- **Transitions**: Controlled by `transition_frames` in `frixos_sprite_asset_t`. If non-zero, the sprite sheets include specific 5-frame entry/exit sequences.
+- **CPU Optimization**: The high-precision timer is **stopped** during the `WAIT` phase. The sprite remains static on frame 0.
+- **Timing Parameters**:
+    - `p66` (`sprite_wait_s`): Seconds to stay in `WAIT` before the next animation sequence.
+    - `p67` (`sprite_cycle_s`): Desired duration of the `CYCLE` phase. Real duration is rounded UP to the nearest full animation cycle to ensure clean loops.
+- **Fallback**: Sprites without transition frames will automatically skip `ENTRY`/`EXIT` and jump between `WAIT` and `CYCLE`.
+
+### Sprite Generation Process
+Weather assets are procedurally generated to ensure perfect alignment and consistency:
+- **Tool**: `tools/gen_weather_sprites.py` (Python).
+- **Format**: RGB565 (Big Endian) packed into a single horizontal C array.
+- **Dimensions**: Fixed at 32x32 pixels per frame.
+- **Transitions**: The generator injects 5 "Entry" (progressive fill) and 5 "Exit" (drain) frames for specific conditions (Rain, Snow).
+- **Output**: Generates `.c` files in `main/assets/` (e.g., `sprite_rain.c`).
+- **Update Workflow**: If modifying the drawing logic, run the script and then rebuild the project to link the new C arrays.
+
+## 📚 Documentation Reference
+For detailed information on weather sprite architecture, transition state machines, and resource optimization, refer to:
+- [docs/weather-sprite-guide.md](docs/weather-sprite-guide.md): Developer guide for usage, configuration, and asset creation.
 
 ## 🌐 Web UI (SPIFFS)
 

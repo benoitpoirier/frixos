@@ -160,7 +160,9 @@
       "show_leading_zero": "Mostrar 0 para hora de um dígito",
       "disable_dots_breathe": "Desativar efeito de respiração dos pontos de hora",
       "show_grid": "Mostrar grelha",
-      "mirror": "Espelhar ecrã"
+      "mirror": "Espelhar ecrã",
+      "sprite_wait_s": "Aguardar antes da animação (s)",
+      "sprite_cycle_s": "Duração do ciclo de animação (s)"
     },
     "day": {
       "title": "Definições do dia",

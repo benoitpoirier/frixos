@@ -101,6 +101,8 @@ extern uint8_t  eeprom_quiet_scroll;
 extern uint8_t  eeprom_quiet_weather;
 extern uint8_t  eeprom_sprite_anim;
 extern uint8_t  eeprom_sprite_weather;
+extern uint8_t  eeprom_sprite_wait_s;   // p66: seconds to wait before entry (0 = no transitions)
+extern uint8_t  eeprom_sprite_cycle_s;  // p67: normal cycle duration in seconds (0 = skip cycle)
 extern uint8_t  eeprom_show_leading_zero;
 extern uint8_t  eeprom_dots_breathe;  // Enable breathing effect for time dots (0=disabled, 1=enabled)
 extern uint8_t  eeprom_color_filter[2]; // [0] = day filter, [1] = night filter

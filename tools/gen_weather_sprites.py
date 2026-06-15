@@ -5,6 +5,7 @@ import math
 SPRITE_WIDTH = 32
 SPRITE_HEIGHT = 32
 DEBUG_SPRITE_BORDER = False
+TRANSITION_FRAMES = 5  # entry/exit frames for rain and snow sprites
 
 RAIN_CLOUD_LIGHT = (238, 244, 255)
 RAIN_CLOUD_MID = (148, 168, 220)
@@ -168,15 +169,28 @@ def draw_sun_orb(canvas, frame, cx, cy, radius, phase):
 
 
 def draw_rotating_sun(canvas, frame, cx, cy, core_radius, phase, pulse_strength=1.0, long_ray_length=6.6, short_ray_base=3.4, ray_scale=1.0, ray_alpha=1.0):
-    pulse = 0.5 + 0.5 * math.sin(phase)
+    # Offset phase by PI/2 so frame 0 (phase=0) corresponds to sin(PI/2) = 1 (max pulse)
+    effective_phase = phase + math.pi / 2.0
+    pulse = 0.5 + 0.5 * math.sin(effective_phase)
     rotation = phase * 0.22
+    
+    # Sun core also pulses slightly
     draw_sun_orb(canvas, frame, cx, cy, core_radius + (pulse - 0.5) * 0.9 * pulse_strength, phase)
+    
+    # Large rays: thicker at base when pulsing
+    # Base width varies from 1.8 to 2.4 based on pulse
+    long_width = 1.8 + (pulse * 0.6 * pulse_strength)
     for idx in range(8):
         angle = rotation + idx * (math.pi / 4.0)
-        draw_tapered_ray(canvas, frame, cx, cy, angle, core_radius + 1.8, max(2, round(long_ray_length * ray_scale)), 1.8, blend((0, 0, 0), SUN_RAY_HOT, ray_alpha))
-    short_scale = (short_ray_base + pulse * 2.3 * pulse_strength) * ray_scale
-    for idx in range(12):
-        angle = rotation + (idx + 0.5) * (2.0 * math.pi / 12.0)
+        draw_tapered_ray(canvas, frame, cx, cy, angle, core_radius + 1.8, max(2, round(long_ray_length * ray_scale)), long_width, blend((0, 0, 0), SUN_RAY_HOT, ray_alpha))
+    
+    # Small rays: remain thin (1.2) but get significantly longer when pulsing
+    # Base length varies significantly with pulse
+    short_scale = (short_ray_base + pulse * 3.5 * pulse_strength) * ray_scale
+    for idx in range(8):
+        # Position them exactly between the 8 main rays
+        angle = rotation + (idx + 0.5) * (math.pi / 4.0)
+        # Keep width at 1.2 constant
         draw_tapered_ray(canvas, frame, cx, cy, angle, core_radius + 1.2, max(2, round(short_scale)), 1.2, blend((0, 0, 0), SUN_RAY, ray_alpha * 0.92))
 
 
@@ -715,8 +729,9 @@ def generate_cloud(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=15):
     return finish_sprite(canvas)
 
 
-def generate_rain(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=10):
-    canvas = SpriteCanvas(width, height, frames)
+def generate_rain(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, normal_frames=10):
+    total_frames = normal_frames + 2 * TRANSITION_FRAMES
+    canvas = SpriteCanvas(width, height, total_frames)
     small_drop_start_y = 10.0
     large_drop_start_y = 11.0
     parts = shift_cloud_parts([
@@ -737,21 +752,43 @@ def generate_rain(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=10):
         {"x": 24.8, "phase": 0.84, "variant": "big_4", "start_y": large_drop_start_y, "height": 4},
         {"x": 27.0, "phase": 0.50, "variant": "small_3", "start_y": small_drop_start_y, "height": 3},
     ]
-    for frame in range(frames):
-        phase = (frame / frames) * 2.0 * math.pi
-        draw_cloud_shape(canvas, frame, parts, phase, morph_x=0.34, morph_y=0.26)
-        draw_cloud_inner_tint(canvas, frame, phase, (10, 23, 4, 11, 16.0, 7.8, 6.0, 3.7), (96, 118, 180), (184, 204, 246), 0.55)
+
+    def _draw_rain_frame(frame_idx, frame_t, drop_filter_fn):
+        phase = (frame_t / normal_frames) * 2.0 * math.pi
+        draw_cloud_shape(canvas, frame_idx, parts, phase, morph_x=0.34, morph_y=0.26)
+        draw_cloud_inner_tint(canvas, frame_idx, phase, (10, 23, 4, 11, 16.0, 7.8, 6.0, 3.7),
+                              (96, 118, 180), (184, 204, 246), 0.55)
         for drop in drops:
-            progress = (frame / frames + drop["phase"]) % 1.0
+            if not drop_filter_fn(drop):
+                continue
+            progress = (frame_t / normal_frames + drop["phase"]) % 1.0
             loop_distance = height - drop["start_y"] + drop["height"]
             top_y = round(drop["start_y"] + progress * loop_distance)
             if 10 <= top_y <= 31:
-                draw_rain_drop(canvas, frame, round(drop["x"]), top_y, drop["variant"])
-    return finish_sprite(canvas)
+                draw_rain_drop(canvas, frame_idx, round(drop["x"]), top_y, drop["variant"])
+
+    # Entry frames: drops fill in progressively (low-phase drops appear first)
+    for e in range(TRANSITION_FRAMES):
+        threshold = (e + 1) / TRANSITION_FRAMES
+        _draw_rain_frame(e, e, lambda d, t=threshold: d["phase"] < t)
+
+    # Normal frames: all drops, same as original behavior
+    for n in range(normal_frames):
+        _draw_rain_frame(TRANSITION_FRAMES + n, n, lambda d: True)
+
+    # Exit frames: drops drain away (low-phase drops disappear first)
+    for x in range(TRANSITION_FRAMES):
+        threshold = x / TRANSITION_FRAMES
+        frame_t = TRANSITION_FRAMES + x
+        _draw_rain_frame(TRANSITION_FRAMES + normal_frames + x, frame_t, lambda d, t=threshold: d["phase"] >= t)
+
+    data, _ = finish_sprite(canvas)
+    return data, total_frames, TRANSITION_FRAMES
 
 
-def generate_snow(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=15):
-    canvas = SpriteCanvas(width, height, frames)
+def generate_snow(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, normal_frames=15):
+    total_frames = normal_frames + 2 * TRANSITION_FRAMES
+    canvas = SpriteCanvas(width, height, total_frames)
     small_flake_start_y = 11.0
     large_flake_start_y = 13.0
     palette = (
@@ -778,12 +815,16 @@ def generate_snow(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=15):
         {"x": 17.3, "phase": 0.76, "shape": 2, "tone": (255, 255, 255), "drift": 0.13, "curve": "diag", "release": -0.5, "speed": 1.0, "start_y": large_flake_start_y},
         {"x": 20.2, "phase": 0.12, "shape": 4, "tone": (255, 255, 255), "drift": -0.11, "curve": "diag", "release": 0.5, "speed": 1.0, "start_y": large_flake_start_y},
     ]
-    for frame in range(frames):
-        phase = (frame / frames) * 2.0 * math.pi
-        draw_cloud_shape(canvas, frame, parts, phase, morph_x=0.06, morph_y=0.05)
-        draw_cloud_inner_tint(canvas, frame, phase, (7, 26, 4, 15, 16.0, 7.6, 7.2, 4.8), mix_colors(RAIN_CLOUD_MID, RAIN_CLOUD_BASE), palette[0], 0.15)
+
+    def _draw_snow_frame(frame_idx, frame_t, flake_filter_fn):
+        phase = (frame_t / normal_frames) * 2.0 * math.pi
+        draw_cloud_shape(canvas, frame_idx, parts, phase, morph_x=0.06, morph_y=0.05)
+        draw_cloud_inner_tint(canvas, frame_idx, phase, (7, 26, 4, 15, 16.0, 7.6, 7.2, 4.8),
+                              mix_colors(RAIN_CLOUD_MID, RAIN_CLOUD_BASE), palette[0], 0.15)
         for flake in flakes:
-            progress = (frame / frames * flake["speed"] + flake["phase"]) % 1.0
+            if not flake_filter_fn(flake):
+                continue
+            progress = (frame_t / normal_frames * flake["speed"] + flake["phase"]) % 1.0
             loop_distance = height - flake["start_y"] + 4.0
             fall_y = flake["start_y"] + progress * loop_distance
             release_mix = max(0.0, 1.0 - progress * 3.2)
@@ -794,8 +835,25 @@ def generate_snow(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=15):
                 drift_x = round(flake["x"] + wind + release_x)
             else:
                 drift_x = round(flake["x"] + release_x)
-            draw_flake(canvas, frame, drift_x, round(fall_y), flake["shape"], flake["tone"])
-    return finish_sprite(canvas)
+            draw_flake(canvas, frame_idx, drift_x, round(fall_y), flake["shape"], flake["tone"])
+
+    # Entry frames: flakes fill in progressively (low-phase flakes appear first)
+    for e in range(TRANSITION_FRAMES):
+        threshold = (e + 1) / TRANSITION_FRAMES
+        _draw_snow_frame(e, e, lambda f, t=threshold: f["phase"] < t)
+
+    # Normal frames: all flakes, same as original behavior
+    for n in range(normal_frames):
+        _draw_snow_frame(TRANSITION_FRAMES + n, n, lambda f: True)
+
+    # Exit frames: flakes drain away (low-phase flakes disappear first)
+    for x in range(TRANSITION_FRAMES):
+        threshold = x / TRANSITION_FRAMES
+        frame_t = TRANSITION_FRAMES + x
+        _draw_snow_frame(TRANSITION_FRAMES + normal_frames + x, frame_t, lambda f, t=threshold: f["phase"] >= t)
+
+    data, _ = finish_sprite(canvas)
+    return data, total_frames, TRANSITION_FRAMES
 
 
 def generate_storm(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=20):
@@ -878,8 +936,14 @@ def generate_fog(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=12):
     return finish_sprite(canvas)
 
 
-def save_to_c_file(filename, data, name, frames, width=SPRITE_WIDTH, height=SPRITE_HEIGHT):
+def save_to_c_file(filename, data, name, frames, width=SPRITE_WIDTH, height=SPRITE_HEIGHT, transition_frames=0):
     with open(filename, "w") as file:
+        file.write("/*\n")
+        file.write(" * AUTO-GENERATED FILE - DO NOT EDIT MANUALLY\n")
+        file.write(" * This file was generated by tools/gen_weather_sprites.py\n")
+        file.write(" * Any manual changes will be overwritten. To modify these sprites,\n")
+        file.write(" * edit the drawing logic in the Python script and re-run it.\n")
+        file.write(" */\n\n")
         file.write('#include "f-sprite.h"\n\n')
         file.write(f'const uint8_t {name}_map[] = {{\n')
         for i in range(0, len(data), 16):
@@ -896,6 +960,8 @@ def save_to_c_file(filename, data, name, frames, width=SPRITE_WIDTH, height=SPRI
         file.write(f'    .data = {name}_map,\n')
         file.write('  },\n')
         file.write('  .fps = FRIXOS_SPRITE_DEFAULT_FPS,\n')
+        if transition_frames > 0:
+            file.write(f'  .transition_frames = {transition_frames},\n')
         file.write('};\n')
 
 
@@ -917,8 +983,13 @@ GENERATORS = {
 def generate_assets(sprite_names=None):
     selected = sprite_names or list(GENERATORS.keys())
     for name in selected:
-        data, frames = GENERATORS[name]()
-        save_to_c_file(f"main/assets/{name}.c", data, name, frames)
+        result = GENERATORS[name]()
+        if len(result) == 3:
+            data, frames, tr_frames = result
+        else:
+            data, frames = result
+            tr_frames = 0
+        save_to_c_file(f"main/assets/{name}.c", data, name, frames, transition_frames=tr_frames)
         print(f"Generated main/assets/{name}.c")
 
 

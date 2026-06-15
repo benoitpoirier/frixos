@@ -160,7 +160,9 @@
       "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
       "disable_dots_breathe": "Wyłącz efekt oddychania kropek czasu",
       "show_grid": "Pokaż siatkę",
-      "mirror": "Odbij wyświetlacz"
+      "mirror": "Odbij wyświetlacz",
+      "sprite_wait_s": "Oczekiwanie przed animacją (s)",
+      "sprite_cycle_s": "Czas trwania cyklu animacji (s)"
     },
     "day": {
       "title": "Ustawienia dzienne",

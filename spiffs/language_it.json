@@ -160,7 +160,9 @@
       "show_leading_zero": "Mostra 0 per ora a cifra singola",
       "disable_dots_breathe": "Disabilita effetto respirazione dei punti ora",
       "show_grid": "Mostra griglia",
-      "mirror": "Specchia display"
+      "mirror": "Specchia display",
+      "sprite_wait_s": "Attesa prima dell'animazione (s)",
+      "sprite_cycle_s": "Durata ciclo animazione (s)"
     },
     "day": {
       "title": "Impostazioni giorno",
