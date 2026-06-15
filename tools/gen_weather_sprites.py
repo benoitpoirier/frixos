@@ -604,11 +604,207 @@ def generate_clearsky(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=10):
     return finish_sprite(canvas)
 
 
-def generate_clearsky_night(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=10):
+
+def lerp(start, end, t):
+    return start + (end - start) * t
+
+def ease_in_out(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3.0 - 2.0 * t)
+
+def flight_lift(t, jolt=False):
+    base = -math.sin(t * math.pi * 2.0) * 1.0
+    if jolt:
+        base -= math.sin(t * math.pi * 3.0) * 1.5
+    return base
+
+def draw_bat(canvas, frame, cx, cy, span, flap_phase=0.0, yaw=0.0):
+    if span < 1: return
+    color = (0, 0, 0)
+    cx, cy, span = float(cx), float(cy), max(3.0, float(span))
+    
+    flap_val = math.sin(flap_phase) # -1.0 to 1.0 (1.0 = wings down, -1.0 = wings up)
+    
+    # Procedural generation matching the reference images
+    if span <= 5.0:
+        # Smallest bat (dash/dot)
+        for dx in (0, 1, -1):
+            canvas.set_pixel(frame, int(cx + dx), int(cy), color)
+        if flap_val < -0.5:
+            canvas.set_pixel(frame, int(cx - 1), int(cy - 1), color)
+            canvas.set_pixel(frame, int(cx + 1), int(cy - 1), color)
+        elif flap_val > 0.5:
+            canvas.set_pixel(frame, int(cx - 1), int(cy + 1), color)
+            canvas.set_pixel(frame, int(cx + 1), int(cy + 1), color)
+        return
+
+    if span <= 12.0:
+        # Medium bat (pixel art style)
+        r = span * 0.15
+        for y in range(int(cy - r), int(cy + r) + 1):
+            for x in range(int(cx - r), int(cx + r) + 1):
+                if (x-cx)**2 + (y-cy)**2 <= r**2:
+                    canvas.set_pixel(frame, x, y, color)
+        
+        # Ears
+        ear_h = span * 0.2
+        canvas.set_pixel(frame, int(cx - r), int(cy - ear_h), color)
+        canvas.set_pixel(frame, int(cx + r), int(cy - ear_h), color)
+        
+        # Wings
+        wing_w = span * 0.5
+        y_w = cy - flap_val * span * 0.3
+        steps = int(wing_w)
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            wx = cx + i
+            wy = cy + (y_w - cy) * t
+            canvas.set_pixel(frame, int(wx), int(wy), color)
+            canvas.set_pixel(frame, int(wx), int(wy + 1), color)
+            wx = cx - i
+            canvas.set_pixel(frame, int(wx), int(wy), color)
+            canvas.set_pixel(frame, int(wx), int(wy + 1), color)
+        return
+
+    # Large bat (32px style)
+    # Body
+    body_w, body_h = span * 0.12, span * 0.18
+    for y in range(int(cy - body_h), int(cy + body_h) + 1):
+        for x in range(int(cx - body_w), int(cx + body_w) + 1):
+            if (x-cx)**2 / max(1, body_w**2) + (y-cy)**2 / max(1, body_h**2) <= 1.0:
+                canvas.set_pixel(frame, x, y, color)
+                
+    # Head and Ears
+    head_r = span * 0.12
+    head_y = cy - body_h * 0.7
+    for y in range(int(head_y - head_r), int(head_y + head_r) + 1):
+        for x in range(int(cx - head_r), int(cx + head_r) + 1):
+            if (x-cx)**2 + (y-head_y)**2 <= head_r**2:
+                canvas.set_pixel(frame, x, y, color)
+                
+    ear_w = span * 0.08
+    ear_h = span * 0.25
+    ear_spread = span * 0.12
+    for side in (-1, 1):
+        ex = cx + side * ear_spread
+        ey = head_y - head_r * 0.2
+        for y in range(int(ey - ear_h), int(ey) + 1):
+            for x in range(int(ex - ear_w), int(ex + ear_w) + 1):
+                # triangle
+                if abs(x - ex) <= ear_w * (y - (ey - ear_h)) / max(1, ear_h):
+                    canvas.set_pixel(frame, x, y, color)
+
+    # Detailed Wings (based on 4 frames from second image)
+    wing_span = span * 0.5 * (1.0 - abs(yaw)*0.5)
+    steps = int(wing_span)
+    scallop_depth = span * 0.12
+    
+    for side in (-1, 1):
+        if yaw * side < -0.5: continue # Hidden by yaw
+        
+        shoulder_y = cy - body_h * 0.3
+        
+        if flap_val > 0.5: # Wings Down
+            elbow_x = cx + side * wing_span * 0.4
+            elbow_y = cy + span * 0.1
+            tip_y = cy + span * 0.3
+        elif flap_val > -0.5: # Wings Mid
+            elbow_x = cx + side * wing_span * 0.5
+            elbow_y = cy - span * 0.1
+            tip_y = cy + span * 0.1
+        else: # Wings Up
+            elbow_x = cx + side * wing_span * 0.6
+            elbow_y = cy - span * 0.3
+            tip_y = cy - span * 0.4
+            
+        tip_x = cx + side * wing_span
+        
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            wx = cx + side * i
+            
+            if t < 0.5:
+                nt = t / 0.5
+                wy = shoulder_y + (elbow_y - shoulder_y) * nt
+            else:
+                nt = (t - 0.5) / 0.5
+                wy = elbow_y + (tip_y - elbow_y) * nt
+                
+            scallop = abs(math.sin(t * math.pi * 3)) * scallop_depth
+            bottom_y = wy + span * 0.15 - scallop
+            
+            for y in range(int(min(wy, bottom_y)), int(max(wy, bottom_y)) + 1):
+                canvas.set_pixel(frame, round(wx), y, color)
+
+
+def generate_clearsky_night(width=SPRITE_WIDTH, height=SPRITE_HEIGHT, frames=50):
     canvas = SpriteCanvas(width, height, frames)
+    moon_radius = 14.0
+    moon_cx, moon_cy = 16.0, 16.0
+    
     for frame in range(frames):
         phase = (frame / frames) * 2.0 * math.pi
-        draw_breathing_moon(canvas, frame, 16, 12, 8.55, phase, pulse_strength=0.9)
+        draw_breathing_moon(canvas, frame, moon_cx, moon_cy, moon_radius, phase * 0.5, pulse_strength=0.15)
+        
+        if frame == 0: continue
+            
+        full_span = 28.0
+        
+        # Total frames = 49 (1 to 49)
+        # 1-13 (13 frames) Entry to other side
+        if frame <= 13:
+            t = (frame - 1) / 12.0
+            cx = lerp(-4.0, 26.0, ease_in_out(t))
+            # soubresaut
+            bump = math.sin(t * math.pi) * -2.0 - math.exp(-((t-0.3)/0.1)**2) * 2.5
+            cy = moon_cy + 2.0 + bump
+            span = lerp(3.0, 10.0, t)
+            yaw = 1.0 
+            flap_phase = frame * 1.5
+            draw_bat(canvas, frame, cx, cy, span, flap_phase, yaw=yaw)
+            
+        # 14-23 (10 frames) Returns to center, grows to full
+        elif frame <= 23:
+            t = (frame - 13) / 10.0
+            cx = lerp(26.0, 16.0, ease_in_out(t))
+            cy = lerp(moon_cy + 2.0, moon_cy, t) - math.sin(t * math.pi) * 1.5
+            span = lerp(10.0, full_span, ease_in_out(t))
+            yaw = lerp(1.0, 0.0, t)
+            flap_phase = 13 * 1.5 + t * math.pi * 1.5
+            draw_bat(canvas, frame, cx, cy, span, flap_phase, yaw=yaw)
+            
+        # 24-37 (14 frames) Hold center, exactly 2 wing beats
+        elif frame <= 37:
+            t = (frame - 23) / 14.0
+            cx = moon_cx
+            base_flap = 13 * 1.5 + math.pi * 1.5
+            flap_phase = base_flap + t * math.pi * 4.0
+            cy = moon_cy + math.sin(flap_phase) * 1.5
+            draw_bat(canvas, frame, cx, cy, full_span, flap_phase, yaw=0.0)
+            
+        # 38-43 (6 frames) Leaves towards entry (left), shrinks to 16px
+        elif frame <= 43:
+            t = (frame - 37) / 6.0
+            cx = lerp(16.0, 6.0, ease_in_out(t))
+            bump = -math.exp(-((t-0.5)/0.2)**2) * 2.5
+            cy = moon_cy + bump
+            span = lerp(full_span, 16.0, ease_in_out(t))
+            yaw = lerp(0.0, -1.0, t) 
+            base_flap = 13*1.5 + math.pi*1.5 + 4.0*math.pi
+            flap_phase = base_flap + t * math.pi * 2.5
+            draw_bat(canvas, frame, cx, cy, span, flap_phase, yaw=yaw)
+            
+        # 44-49 (6 frames) Crosses moon to right, shrinks to 3px
+        else:
+            t = (frame - 43) / 6.0
+            cx = lerp(6.0, 36.0, t**1.5)
+            cy = lerp(moon_cy, moon_cy + 3.0, t) - math.sin(t * math.pi)*1.5
+            span = lerp(16.0, 3.0, t)
+            yaw = lerp(-1.0, 1.0, min(1.0, t*2.5))
+            base_flap = 13*1.5 + math.pi*1.5 + 4.0*math.pi + 2.5*math.pi
+            flap_phase = base_flap + t * math.pi * 2.5
+            draw_bat(canvas, frame, cx, cy, span, flap_phase, yaw=yaw)
+            
     return finish_sprite(canvas)
 
 
