@@ -9,7 +9,7 @@
 
 /* Little-endian magic: "FSXL" */
 #define FRIXOS_SCREEN_BIN_MAGIC 0x4653584Cu
-#define FRIXOS_SCREEN_BIN_FORMAT 1
+#define FRIXOS_SCREEN_BIN_FORMAT 4
 
 #define FRIXOS_SCREEN_BIN_FONT_LEN 12
 

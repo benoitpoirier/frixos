@@ -339,6 +339,7 @@
     justify-self: start;
     flex: unset;
     max-width: none;
+    cursor: pointer;
 }
 
 .screen-options .form-group input[type="checkbox"] {
@@ -347,6 +348,15 @@
     margin: 0;
     justify-self: start;
     flex: unset;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+/* Checkbox-container rows inside screen-options inherit full-width flex layout;
+   indent them to roughly align with the second grid column for visual coherence */
+.screen-options .checkbox-container {
+    padding-left: 0;
+    margin-bottom: 8px;
 }
 
 .screen-options .form-group:has(textarea) {
@@ -493,9 +503,34 @@
 .schedule-slot-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 6px;
     flex-wrap: wrap;
+    padding: 6px 8px;
+    background: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.schedule-slot-row select,
+.schedule-slot-row input[type="number"],
+.schedule-slot-row input[type="text"] {
+    padding: 4px 6px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    font-family: inherit;
+}
+
+.schedule-slot-row select:focus,
+.schedule-slot-row input[type="number"]:focus,
+.schedule-slot-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 170, 255, 0.2);
 }
 
 .schedule-slot-row select { flex: 0 0 auto; height: 40px; width: auto; }

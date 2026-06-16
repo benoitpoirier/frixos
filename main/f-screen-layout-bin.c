@@ -5,10 +5,10 @@
 
 static const char *TAG = "f-screen-bin";
 
-_Static_assert(sizeof(screen_widget_t) == 13, "screen_widget_t wire size changed");
-_Static_assert(sizeof(screen_layout_profile_t) == 1719, "screen_layout_profile_t wire size changed");
+_Static_assert(sizeof(screen_widget_t) == 25, "screen_widget_t wire size changed");
+_Static_assert(sizeof(screen_layout_profile_t) == 1972, "screen_layout_profile_t wire size changed");
 _Static_assert(sizeof(screen_layout_bin_header_t) == 64, "screen_layout_bin_header_t size changed");
-_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 3502, "screen_layout_wire_t size changed");
+_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 4008, "screen_layout_wire_t size changed");
 
 static int clamp_int(int v, int lo, int hi)
 {

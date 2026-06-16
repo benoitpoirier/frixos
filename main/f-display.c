@@ -20,6 +20,7 @@
 
 #include "time.h"
 #include "math.h"
+#include <string.h>
 #include <stdlib.h>
 #include "esp_timer.h"
 #include "esp_system.h"
@@ -110,8 +111,18 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_glucose = NULL,
          *img_glucose_trend = NULL,
          *img_wifi = NULL,
-         *img_mgdl = NULL,
          *img_mgdl_aux = NULL;
+
+#define CGM_GRAPH_MAX_W  120   /* maximum configurable canvas width */
+#define CGM_GRAPH_H       40   /* fixed canvas height */
+#define CGM_MARKER_LEFT_W  19  /* pixels reserved for glucose value labels */
+#define CGM_MARKER_BOT_H   10  /* pixels reserved for time labels (font_h+2) */
+/* Canvas pixel buffer – heap-allocated to match configured dimensions.
+ * Avoids reserving 9,600 bytes of static BSS DRAM; grows on demand, never shrinks. */
+static uint8_t *cgm_canvas_buf      = NULL;
+static int      cgm_canvas_buf_size = 0;  /* bytes currently allocated */
+static lv_obj_t *cgm_graph_canvas = NULL;
+static lv_obj_t *img_mgdl = NULL;
 
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
@@ -321,7 +332,13 @@ static void apply_message_widget_styles(const screen_widget_t *w)
   if (label_msg == NULL || w == NULL)
     return;
 
-  lv_color_t msg_color = lv_color_make(w->color_r, w->color_g, w->color_b);
+  /* During boot (before layout is live) or if widget color is unset (all zeros),
+   * fall back to white text on black background. */
+  lv_color_t msg_color;
+  if (!screen_layout_positions_live || (!w->color_r && !w->color_g && !w->color_b))
+    msg_color = lv_color_hex(0xFFFFFF);
+  else
+    msg_color = lv_color_make(w->color_r, w->color_g, w->color_b);
   lv_obj_set_style_text_color(label_msg, msg_color, 0);
   apply_text_widget_background(label_msg, w, active_message_font_index());
   if (label_msg_loop != NULL)
@@ -762,7 +779,10 @@ void set_scroll_message(const char *msg)
       lv_obj_set_pos(label_msg_loop, msg_x + ipos + scroll_period, msg_y);
     }
     // else: same content, same font — belt keeps scrolling uninterrupted.
-    lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
+    // Only show the loop label if the message widget is actually enabled (or we are
+    // in boot mode where the widget is displayed regardless of the enabled flag).
+    if (!screen_layout_positions_live || w_msg->enabled || !time_valid)
+      lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
   }
   else
   { // centered
@@ -850,6 +870,23 @@ void startup_display(void)
   img_glucose = lv_image_create(lv_scr_act());
   img_glucose_trend = lv_image_create(lv_scr_act());
   img_wifi = lv_image_create(lv_scr_act());
+
+  cgm_graph_canvas = lv_canvas_create(lv_scr_act());
+  /* Allocate at default dimensions; update_cgm_graph() grows the buffer if needed. */
+  {
+    int init_sz = 90 * 34 * 2; /* default 90×34 px RGB565 = 6 120 bytes */
+    cgm_canvas_buf = malloc(init_sz);
+    if (cgm_canvas_buf) {
+      cgm_canvas_buf_size = init_sz;
+      memset(cgm_canvas_buf, 0, init_sz);
+      lv_canvas_set_buffer(cgm_graph_canvas, cgm_canvas_buf, 90, 34, LV_COLOR_FORMAT_RGB565);
+    } else {
+      cgm_canvas_buf_size = 0;
+      ESP_LOGE(TAG, "cgm_canvas_buf initial alloc failed");
+    }
+  }
+  lv_obj_add_flag(cgm_graph_canvas, LV_OBJ_FLAG_HIDDEN);
+
   img_mgdl = lv_image_create(lv_scr_act());
   img_mgdl_aux = lv_image_create(lv_scr_act());
   img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
@@ -887,6 +924,7 @@ void startup_display(void)
   lv_obj_add_flag(img_weather, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_glucose, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_glucose_trend, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(cgm_graph_canvas, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_wifi, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_mgdl, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_mgdl_aux, LV_OBJ_FLAG_HIDDEN);
@@ -1042,6 +1080,7 @@ static bool slot_is_available(const display_slot_t *s)
   {
     case SLOT_TYPE_TIME:         return true;
     case SLOT_TYPE_CGM:          return is_glucose_on() && is_glucose_fresh();
+    case SLOT_TYPE_CGM_GRAPH:    return is_glucose_on() && is_glucose_fresh();
     case SLOT_TYPE_WEATHER_TEMP: return last_weather_update > 0;
     case SLOT_TYPE_HA:           return get_ha_slot_value(s->entity) != NULL;
     default:                     return false;
@@ -1409,20 +1448,332 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
 
   show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
   show_object(img_moon, w_moon->enabled && time_valid);
-  show_object(label_msg, w_msg->enabled || !time_valid);
+  const bool show_msg = w_msg->enabled || !time_valid;
+  show_object(label_msg, show_msg);
+  if (!show_msg)
+    show_object(label_msg_loop, false); /* belt loop label must also follow widget enabled state */
 
   if (wifi_disabled_by_active_hours)
   {
     show_object(img_wifi, layout->widget[SCREEN_ELEM_WIFI_OFF].enabled);
     show_object(img_glucose, false);
     show_object(img_glucose_trend, false);
+    show_object(cgm_graph_canvas, false);
   }
   else
   {
     show_object(img_wifi, false);
-    show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
+    show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on() && is_glucose_fresh());
     show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_on() && is_glucose_fresh());
+    show_object(cgm_graph_canvas, layout->widget[SCREEN_ELEM_CGM_GRAPH].enabled && is_glucose_on() && is_glucose_fresh());
   }
+}
+
+void update_cgm_graph(void)
+{
+    if (!cgm_graph_canvas) return;
+    const screen_layout_profile_t *layout_p = &eeprom_screen_layout.profile[font_index];
+    if (!layout_widget_enabled(layout_p, SCREEN_ELEM_CGM_GRAPH)) return;
+    if (!is_glucose_on() || !is_glucose_fresh()) return;
+
+    int n = glucose_data.history_count;
+    if (n > GLUCOSE_HISTORY_MAX) n = GLUCOSE_HISTORY_MAX;
+    if (n < 2) return;
+
+    const screen_widget_t *w = &layout_p->widget[SCREEN_ELEM_CGM_GRAPH];
+
+    /* --- Widget options -------------------------------------------------- */
+    int graph_w = w->width ? (int)w->width : 100;
+    if (graph_w < 60)              graph_w = 60;
+    if (graph_w > CGM_GRAPH_MAX_W) graph_w = CGM_GRAPH_MAX_W;
+
+    int h_enc   = (w->font >> 1) & 0x1F;
+    int graph_h = 40 - h_enc;
+    if (graph_h < 28)          graph_h = 28;
+    if (graph_h > CGM_GRAPH_H) graph_h = CGM_GRAPH_H;
+
+    bool show_x_markers = (w->font & 0x01) != 0;
+    bool show_y_markers = (w->font & 0x20) != 0;
+
+    int time_scale_min = w->align ? (int)w->align * 10 : 180;
+    if (time_scale_min < 60)  time_scale_min = 60;
+    if (time_scale_min > 480) time_scale_min = 480;
+
+    lv_color_t col_ok     = (w->color_r || w->color_g || w->color_b)
+                            ? lv_color_make(w->color_r, w->color_g, w->color_b)
+                            : lv_color_hex(0x00CC00);
+    lv_color_t col_warn   = (w->warn_r || w->warn_g || w->warn_b)
+                            ? lv_color_make(w->warn_r, w->warn_g, w->warn_b)
+                            : lv_color_hex(0xFF8800);
+    lv_color_t col_danger = (w->bg_r || w->bg_g || w->bg_b)
+                            ? lv_color_make(w->bg_r, w->bg_g, w->bg_b)
+                            : lv_color_hex(0xFF0000);
+    lv_color_t col_label  = (w->label_r || w->label_g || w->label_b)
+                            ? lv_color_make(w->label_r, w->label_g, w->label_b)
+                            : lv_color_hex(0xFFFFFF);
+    lv_color_t col_axis   = (w->axis_r || w->axis_g || w->axis_b)
+                            ? lv_color_make(w->axis_r, w->axis_g, w->axis_b)
+                            : lv_color_hex(0x777777);
+    lv_color_t col_band   = (w->band_r || w->band_g || w->band_b)
+                            ? lv_color_make(w->band_r, w->band_g, w->band_b)
+                            : lv_color_hex(0x003300);
+
+    /* --- Plot area: fixed margins when markers on, minimal otherwise ------ */
+    int32_t left_m  = show_y_markers ? 19 : 2;
+    int32_t top_m   = (show_x_markers || show_y_markers) ?  3 : 2;
+    int32_t right_m = (show_x_markers || show_y_markers) ?  3 : 2;
+    int32_t bot_m   = show_x_markers ?  8 : 2;
+
+    int32_t plot_x1   = left_m;
+    int32_t plot_x2   = (int32_t)graph_w  - right_m - 1;
+    int32_t plot_y1   = top_m;
+    int32_t plot_y2   = (int32_t)graph_h  - bot_m   - 1;
+    int32_t plot_h_px = plot_y2 - plot_y1 + 1;
+    int32_t plot_w_px = plot_x2 - plot_x1 + 1;
+
+    if (plot_h_px < 2 || plot_w_px < 2) return;
+
+    /* px_per_min: maps 0..time_scale_min → plot_x2..plot_x1 */
+    float px_per_min = (float)(plot_w_px - 1) / (float)time_scale_min;
+
+    time_t now = time(NULL);
+
+    /* --- Find data range (only visible-window points) -------------------- */
+    float data_min = 1e9f, data_max = -1e9f;
+    bool  has_vis  = false;
+    for (int i = 0; i < n; i++) {
+        int32_t age_m = (int32_t)((now - glucose_data.history[i].timestamp) / 60);
+        if (age_m >= 0 && age_m < time_scale_min) {
+            float v = glucose_data.history[i].gl_mgdl;
+            if (v < data_min) data_min = v;
+            if (v > data_max) data_max = v;
+            has_vis = true;
+        }
+    }
+    if (!has_vis) return;
+    if (data_max <= data_min) data_max = data_min + 1.0f;
+
+    /* Y-scale: fit all visible data exactly within the plot area */
+    float disp_min = data_min;
+    float disp_max = data_max;
+    float range    = disp_max - disp_min;
+    if (range < 1.0f) range = 1.0f;
+
+    float band_low  = (float)eeprom_glucose_low;
+    float band_high = (float)eeprom_glucose_high;
+
+/* value → canvas Y (0=top); clamp to plot area */
+#define V2Y(v)  ( plot_y2 - (int32_t)(((float)(v) - disp_min) / range * (float)(plot_h_px - 1)) )
+#define CY(y)   ( (y) < plot_y1 ? plot_y1 : ((y) > plot_y2 ? plot_y2 : (y)) )
+/* age in minutes → canvas X (rightmost = newest) */
+#define V2X(a)  ( plot_x2 - (int32_t)((float)(a) * px_per_min) )
+
+    /* Grow the canvas buffer if the configured dimensions exceed current allocation. */
+    {
+      int needed = graph_w * graph_h * 2;
+      if (needed > cgm_canvas_buf_size) {
+        uint8_t *nb = realloc(cgm_canvas_buf, needed);
+        if (!nb) {
+          ESP_LOGE(TAG, "cgm_canvas_buf realloc %d bytes failed", needed);
+          return;
+        }
+        cgm_canvas_buf = nb;
+        cgm_canvas_buf_size = needed;
+      }
+    }
+    lvgl_port_lock(0);
+    lv_obj_add_flag(cgm_graph_canvas, LV_OBJ_FLAG_HIDDEN);
+    memset(cgm_canvas_buf, 0, (size_t)graph_w * graph_h * 2); /* clear to black, avoids trails */
+    lv_canvas_set_buffer(cgm_graph_canvas, cgm_canvas_buf, graph_w, graph_h, LV_COLOR_FORMAT_RGB565);
+    lv_layer_t layer;
+    lv_canvas_init_layer(cgm_graph_canvas, &layer);
+
+    /* 1. Tolerance band (background layer, left_m+1 .. graph_w-2) */
+    {
+        int32_t yh = CY(V2Y(band_high));
+        int32_t yl = CY(V2Y(band_low));
+        if (yl > yh) {
+            lv_draw_rect_dsc_t band;
+            lv_draw_rect_dsc_init(&band);
+            band.bg_color    = col_band;
+            band.bg_opa      = LV_OPA_COVER;
+            band.border_width = 0;
+            lv_area_t ba = {left_m + 1, yh, graph_w - 2, yl};
+            lv_draw_rect(&layer, &band, &ba);
+        }
+    }
+
+    /* 3. Glucose curve (2 px wide, time-based X) */
+    {
+        lv_draw_line_dsc_t ld;
+        lv_draw_line_dsc_init(&ld);
+        ld.width = 2;
+
+        for (int i = 0; i < n - 1; i++) {
+            float v1  = glucose_data.history[i].gl_mgdl;
+            float v2  = glucose_data.history[i + 1].gl_mgdl;
+            float avg = (v1 + v2) * 0.5f;
+
+            if      (avg >= band_low && avg <= band_high)                    ld.color = col_ok;
+            else if (avg < (band_low - 15.0f) || avg > (band_high + 15.0f)) ld.color = col_danger;
+            else                                                              ld.color = col_warn;
+
+            int32_t a1 = (int32_t)((now - glucose_data.history[i].timestamp)     / 60);
+            int32_t a2 = (int32_t)((now - glucose_data.history[i + 1].timestamp) / 60);
+            int32_t x1 = V2X(a1);
+            int32_t x2 = V2X(a2);
+            int32_t y1 = CY(V2Y(v1));
+            int32_t y2 = CY(V2Y(v2));
+
+            if (x1 < plot_x1 && x2 < plot_x1) continue;
+            if (x1 > plot_x2 && x2 > plot_x2) continue;
+            if (x1 < plot_x1) {
+                int32_t dx = x2 - x1;
+                if (dx) y1 = y1 + (y2 - y1) * (plot_x1 - x1) / dx;
+                x1 = plot_x1;
+            }
+            if (x2 > plot_x2) {
+                int32_t dx = x2 - x1;
+                if (dx) y2 = y1 + (y2 - y1) * (plot_x2 - x1) / dx;
+                x2 = plot_x2;
+            }
+            y1 = CY(y1); y2 = CY(y2);
+
+            ld.p1.x = x1; ld.p1.y = y1;
+            ld.p2.x = x2; ld.p2.y = y2;
+            lv_draw_line(&layer, &ld);
+        }
+    }
+
+    /* 4 & 5. Axis markers (on top of band and curve) */
+    if (show_x_markers || show_y_markers) {
+        const lv_font_t *mkr_font = &frixos_8;
+        const int32_t    font_h   = (int32_t)mkr_font->line_height;
+
+        lv_draw_line_dsc_t mld;
+        lv_draw_line_dsc_init(&mld);
+        mld.width = 1;
+        mld.color = col_axis;
+
+        lv_draw_label_dsc_t ldsc;
+        lv_draw_label_dsc_init(&ldsc);
+        ldsc.font       = mkr_font;
+        ldsc.color      = col_label;
+        ldsc.opa        = LV_OPA_COVER;
+        ldsc.text_local = 1; /* lv_draw_label is deferred; force strdup so the local buffer is safe */
+
+        /* Y-axis: horizontal lines at data_min and data_max */
+        if (show_y_markers) {
+            ldsc.align = LV_TEXT_ALIGN_RIGHT;
+            char y_labels[2][8];
+            float y_marks[2] = { data_min, data_max };
+            for (int mi = 0; mi < 2; mi++) {
+                float   val    = y_marks[mi];
+                int32_t mark_y = CY(V2Y(val));
+
+                if (eeprom_glucose_unit == 1)
+                    snprintf(y_labels[mi], sizeof(y_labels[mi]), "%.1f", val / 18.0182f);
+                else
+                    snprintf(y_labels[mi], sizeof(y_labels[mi]), "%d", (int)roundf(val));
+
+                /* Label in left margin, vertically centered on mark_y */
+                int32_t ly1 = mark_y - font_h / 2;
+                int32_t ly2 = ly1 + font_h - 1;
+                if (ly1 < 0)      { ly2 -= ly1; ly1 = 0; }
+                if (ly2 > graph_h - 1) { ly1 -= (ly2 - (graph_h - 1)); ly2 = graph_h - 1; }
+                if (ly1 < 0) ly1 = 0;
+
+                ldsc.text = y_labels[mi];
+                lv_area_t la = {0, ly1, left_m - 2, ly2};
+                lv_draw_label(&layer, &ldsc, &la);
+
+                /* Horizontal line across plot area */
+                mld.p1.x = plot_x1; mld.p1.y = mark_y;
+                mld.p2.x = plot_x2; mld.p2.y = mark_y;
+                lv_draw_line(&layer, &mld);
+            }
+        } /* end show_y_markers */
+
+        if (show_x_markers) {
+            ldsc.align = LV_TEXT_ALIGN_CENTER;
+            /* X-axis: hourly marks, max 2 labels (or 1 if width <= 60 px)
+             * - Rightmost eligible: mark_x <= graph_w - 11 (≥10 px from right)
+             * - Leftmost eligible:  mark_x >= plot_x1      (inside plot area)
+             * Label text: hour with 'h' suffix (e.g. "14h")                   */
+            time_t mark_interval = 3600;
+            time_t first_hour    = (now / mark_interval) * mark_interval;
+            if (first_hour > now) first_hour -= mark_interval;
+
+            int32_t sel_x[2]   = {-1, -1};  /* [0]=rightmost, [1]=leftmost */
+            time_t  sel_mt[2]  = {0,   0};
+
+            /* Rightmost: first (youngest) hour mark that is ≥10 px from right edge */
+            for (time_t mt = first_hour; ; mt -= mark_interval) {
+                int32_t age_m  = (int32_t)((now - mt) / 60);
+                if (age_m >= time_scale_min) break;
+                int32_t mark_x = V2X(age_m);
+                if (mark_x < plot_x1) break;
+                if (mark_x <= graph_w - 11) {
+                    sel_x[0] = mark_x; sel_mt[0] = mt; break;
+                }
+            }
+
+            /* Leftmost: keep updating → last value = oldest mark that is inside plot area */
+            for (time_t mt = first_hour; ; mt -= mark_interval) {
+                int32_t age_m  = (int32_t)((now - mt) / 60);
+                if (age_m >= time_scale_min) break;
+                int32_t mark_x = V2X(age_m);
+                if (mark_x < 0) break;
+                if (mark_x >= plot_x1) { sel_x[1] = mark_x; sel_mt[1] = mt; }
+            }
+
+            int max_x_marks = (graph_w > 60) ? 2 : 1;
+            char x_labels[2][6];  /* e.g. "14h" + NUL, enough for 12-hr "12h" */
+
+            for (int mxi = 0; mxi < max_x_marks; mxi++) {
+                int32_t mx  = sel_x[mxi];
+                time_t  mmt = sel_mt[mxi];
+                if (mx < 0) continue;
+                if (mxi == 1 && sel_x[1] == sel_x[0]) continue; /* same mark */
+
+                /* Vertical line: 1 px beyond plot area on each end */
+                mld.p1.x = mx; mld.p1.y = plot_y1 - 1;
+                mld.p2.x = mx; mld.p2.y = plot_y2 + 1;
+                lv_draw_line(&layer, &mld);
+
+                /* Hour label with 'h' suffix (e.g. "14h"), drawn below plot area */
+                struct tm tm_buf;
+                localtime_r(&mmt, &tm_buf);
+                if (eeprom_12hour) {
+                    int h = tm_buf.tm_hour % 12;
+                    if (h == 0) h = 12;
+                    snprintf(x_labels[mxi], sizeof(x_labels[mxi]), "%dh", h);
+                } else {
+                    snprintf(x_labels[mxi], sizeof(x_labels[mxi]), "%dh", tm_buf.tm_hour);
+                }
+
+                int32_t lw  = (int32_t)strlen(x_labels[mxi]) * 6; /* ~6 px/char */
+                int32_t lx1 = mx - lw / 2;
+                int32_t lx2 = lx1 + lw - 1;
+                if (lx1 < 0)           lx1 = 0;
+                if (lx2 > graph_w - 1) lx2 = graph_w - 1;
+                int32_t ly1 = graph_h - font_h;
+                int32_t ly2 = graph_h - 1;
+
+                ldsc.text = x_labels[mxi];
+                lv_area_t la = {lx1, ly1, lx2, ly2};
+                lv_draw_label(&layer, &ldsc, &la);
+            }
+        } /* end show_x_markers */
+    }
+
+    lv_canvas_finish_layer(cgm_graph_canvas, &layer);
+    lv_obj_clear_flag(cgm_graph_canvas, LV_OBJ_FLAG_HIDDEN);
+    lvgl_port_unlock();
+
+#undef V2Y
+#undef CY
+#undef V2X
 }
 
 #define SCREEN_LAYER_MAX 4
@@ -1452,6 +1803,9 @@ static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t 
     break;
   case SCREEN_ELEM_WIFI_OFF:
     screen_layout_push_obj(img_wifi, objs, count, 12);
+    break;
+  case SCREEN_ELEM_CGM_GRAPH:
+    screen_layout_push_obj(cgm_graph_canvas, objs, count, 12);
     break;
   case SCREEN_ELEM_WEATHER:
     screen_layout_push_obj(img_weather, objs, count, 12);
@@ -1517,7 +1871,7 @@ static void apply_screen_layout_z_order(const screen_layout_profile_t *layout)
 
   for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
   {
-    lv_obj_t *objs[12];
+    lv_obj_t *objs[GLUCOSE_HISTORY_MAX + 10];
     int count = 0;
     screen_layout_collect_elem_objects((screen_element_id_t)order[i], objs, &count);
     for (int j = 0; j < count; j++)
@@ -1542,6 +1896,7 @@ static void apply_screen_layout_positions(void)
   const screen_widget_t *w_time_aux = &layout->widget[SCREEN_ELEM_TIME_AUX];
   const screen_widget_t *w_ampm = &layout->widget[SCREEN_ELEM_AMPM];
   const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
+  const screen_widget_t *w_cgm_graph = &layout->widget[SCREEN_ELEM_CGM_GRAPH];
 
   lvgl_port_lock(0);
   lv_obj_align(img_weather, LV_ALIGN_TOP_LEFT, layout_abs_x(w_weather), layout_abs_y(w_weather));
@@ -1549,6 +1904,7 @@ static void apply_screen_layout_positions(void)
   lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_level), layout_abs_y(w_glucose_level));
   lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, layout_abs_x(w_wifi), layout_abs_y(w_wifi));
   lv_obj_align(img_glucose_trend, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_trend), layout_abs_y(w_glucose_trend));
+  lv_obj_align(cgm_graph_canvas, LV_ALIGN_TOP_LEFT, layout_abs_x(w_cgm_graph), layout_abs_y(w_cgm_graph));
   lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 79, layout_abs_y(w_time) + 5);
   lv_obj_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 79, layout_abs_y(w_time_aux) + 5);
 
@@ -1715,6 +2071,9 @@ void display_changed(void)
   {
     set_scroll_message(last_scroll_msg);
   }
+
+  // Redraw CGM graph with current history (positions / visibility may have changed)
+  update_cgm_graph();
 }
 
 // allow -1 to display nothing
@@ -1918,8 +2277,8 @@ static void handle_integration_and_messages(void)
       lv_image_set_offset_x(img_glucose, -glucose_index * 14);
       lv_image_set_offset_x(img_glucose_trend, -glucose_data.trend_arrow * 12);
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-      show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
-      show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_fresh());
+      show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on() && is_glucose_fresh());
+      show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_on() && is_glucose_fresh());
       lvgl_port_unlock();
     }
     else
@@ -2205,6 +2564,8 @@ static void update_display_content(time_t now)
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
   lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
   lvgl_port_unlock();
+
+  update_cgm_graph();
 
   last_minute = timeinfo.tm_min;
 

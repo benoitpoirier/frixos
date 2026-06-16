@@ -15,6 +15,7 @@
 #include "f-dexcom.h"
 #include "frixos.h"
 #include "cJSON.h"
+#include "f-display.h"
 
 static const char *TAG = "f-dexcom";
 
@@ -35,6 +36,7 @@ char dexcom_session_id[64] = {0};
 // Buffer for Dexcom responses
 static char *dexcom_response_buffer = NULL;
 static int dexcom_response_len = 0;
+static size_t dexcom_response_buf_size = HTTP_BUFFER_SIZE;
 
 // Persistent HTTP client for Dexcom
 static esp_http_client_handle_t dexcom_client = NULL;
@@ -66,10 +68,10 @@ static esp_err_t dexcom_http_event_handler(esp_http_client_event_t *evt)
 
         // Check if we have enough space
         if (evt->data_len <= 0 || dexcom_response_len < 0 ||
-            (dexcom_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
+            (dexcom_response_len + evt->data_len) >= (int)dexcom_response_buf_size)
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
-                        dexcom_response_len, evt->data_len, HTTP_BUFFER_SIZE);
+                        dexcom_response_len, evt->data_len, (int)dexcom_response_buf_size);
             dexcom_response_len = 0;
             return ESP_FAIL;
         }
@@ -335,8 +337,7 @@ bool fetch_dexcom_glucose()
         // Step 3: Fetch glucose data
         const char *base_url = DEXCOM_BASE_URLS[eeprom_dexcom_region];
         char url[384];
-        snprintf(url, sizeof(url), "%s/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=%s&minutes=1440&maxCount=2", base_url, dexcom_session_id);
-        //snprintf(url, sizeof(url), "https://share2.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=e629db54-0854-48d6-8e96-2252fe66750a&minutes=1440&maxCount=4");
+        snprintf(url, sizeof(url), "%s/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=%s&minutes=480&maxCount=48", base_url, dexcom_session_id);
 
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom fetch %s", url);
         
@@ -347,7 +348,8 @@ bool fetch_dexcom_glucose()
             return false;
         }
         
-        dexcom_response_buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "DEXCOM_HTTP");
+        dexcom_response_buf_size = HTTP_BUFFER_SIZE * 2;
+        dexcom_response_buffer = get_shared_buffer(dexcom_response_buf_size, "DEXCOM_HTTP");
         if (!dexcom_response_buffer)
         {
             release_ssl_semaphore();
@@ -369,62 +371,76 @@ bool fetch_dexcom_glucose()
             if (status_code == 200)
             {
                 cJSON *root = cJSON_Parse(dexcom_response_buffer);
-                if (root && cJSON_IsArray(root) && cJSON_GetArraySize(root) >= 1)
+                int arr_size = root && cJSON_IsArray(root) ? cJSON_GetArraySize(root) : 0;
+                if (arr_size >= 1)
                 {
+                    /* --- Latest reading (current value + trend) --- */
                     cJSON *latest = cJSON_GetArrayItem(root, 0);
-                    cJSON *previous = cJSON_GetArraySize(root) > 1 ? cJSON_GetArrayItem(root, 1) : NULL;
+                    cJSON *value   = cJSON_GetObjectItem(latest, "Value");
+                    cJSON *wt      = cJSON_GetObjectItem(latest, "WT");
+                    cJSON *trend   = cJSON_GetObjectItem(latest, "Trend");
 
-                    // Get latest reading
-                    cJSON *value = cJSON_GetObjectItem(latest, "Value");
-                    cJSON *timestamp = cJSON_GetObjectItem(latest, "WT");
-                    cJSON *trend = cJSON_GetObjectItem(latest, "Trend");
-
-                    if (cJSON_IsNumber(value) && cJSON_IsString(timestamp))
+                    if (cJSON_IsNumber(value) && cJSON_IsString(wt))
                     {
                         glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
-                        glucose_data.current_gl_mgdl = value->valuedouble;
-                        glucose_data.timestamp = parse_dexcom_timestamp(timestamp->valuestring);
+                        glucose_data.current_gl_mgdl  = (float)value->valuedouble;
+                        glucose_data.timestamp        = parse_dexcom_timestamp(wt->valuestring);
 
-                        // Get previous reading if available
-                        if (previous)
+                        /* Previous reading for delta */
+                        if (arr_size > 1)
                         {
-                            value = cJSON_GetObjectItem(previous, "Value");
-                            if (cJSON_IsNumber(value))
-                            {
-                                glucose_data.previous_gl_mgdl = value->valuedouble;
-                            }
+                            cJSON *prev_val = cJSON_GetObjectItem(cJSON_GetArrayItem(root, 1), "Value");
+                            if (cJSON_IsNumber(prev_val))
+                                glucose_data.previous_gl_mgdl = (float)prev_val->valuedouble;
                         }
                         else
                         {
                             glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
                         }
-
-                        // Calculate difference
                         glucose_data.gl_diff = glucose_data.current_gl_mgdl - glucose_data.previous_gl_mgdl;
-                        
-                        // Map Dexcom Trend string to our 5-value system
-                        // 0=down fast, 1=45 down, 2=stable, 3=45 up, 4=up fast, -1=no arrow
+
+                        /* Trend arrow */
                         if (trend && cJSON_IsString(trend))
                         {
-                            const char *trend_str = trend->valuestring;
-                            if (strcmp(trend_str, "DoubleDown") == 0 || strcmp(trend_str, "SingleDown") == 0)
-                                glucose_data.trend_arrow = 0; // down fast
-                            else if (strcmp(trend_str, "FortyFiveDown") == 0)
-                                glucose_data.trend_arrow = 1; // 45 down
-                            else if (strcmp(trend_str, "Flat") == 0)
-                                glucose_data.trend_arrow = 2; // stable
-                            else if (strcmp(trend_str, "FortyFiveUp") == 0)
-                                glucose_data.trend_arrow = 3; // 45 up
-                            else if (strcmp(trend_str, "SingleUp") == 0 || strcmp(trend_str, "DoubleUp") == 0)
-                                glucose_data.trend_arrow = 4; // up fast (rising)
-                            else
-                                glucose_data.trend_arrow = -1; // None, NotComputable, RateOutOfRange
+                            const char *ts = trend->valuestring;
+                            if      (strcmp(ts, "DoubleDown")   == 0 || strcmp(ts, "SingleDown")  == 0) glucose_data.trend_arrow = 0;
+                            else if (strcmp(ts, "FortyFiveDown") == 0)                                   glucose_data.trend_arrow = 1;
+                            else if (strcmp(ts, "Flat")          == 0)                                   glucose_data.trend_arrow = 2;
+                            else if (strcmp(ts, "FortyFiveUp")   == 0)                                   glucose_data.trend_arrow = 3;
+                            else if (strcmp(ts, "SingleUp")      == 0 || strcmp(ts, "DoubleUp")   == 0) glucose_data.trend_arrow = 4;
+                            else                                                                          glucose_data.trend_arrow = -1;
                         }
                         else
                         {
-                            glucose_data.trend_arrow = -1; // Invalid or missing trend data
+                            glucose_data.trend_arrow = -1;
                         }
-                        
+
+                        /* --- Fill history (all entries, oldest-first order) --- */
+                        time_t now_ts = time(NULL);
+                        int hist_count = 0;
+                        static glucose_history_point_t dexcom_hist[GLUCOSE_HISTORY_MAX];
+                        for (int hi = 0; hi < arr_size && hist_count < GLUCOSE_HISTORY_MAX; hi++)
+                        {
+                            cJSON *item   = cJSON_GetArrayItem(root, hi);
+                            cJSON *hval   = cJSON_GetObjectItem(item, "Value");
+                            cJSON *hwt    = cJSON_GetObjectItem(item, "WT");
+                            if (!cJSON_IsNumber(hval) || !cJSON_IsString(hwt)) continue;
+                            time_t hts    = parse_dexcom_timestamp(hwt->valuestring);
+                            int32_t age_m = (int32_t)((now_ts - hts) / 60);
+                            if (age_m < 0 || age_m >= GLUCOSE_HISTORY_MINUTES) continue;
+                            /* Insertion sort: keep oldest first */
+                            int pos = hist_count;
+                            while (pos > 0 && dexcom_hist[pos - 1].timestamp > hts) pos--;
+                            memmove(&dexcom_hist[pos + 1], &dexcom_hist[pos],
+                                    sizeof(glucose_history_point_t) * (hist_count - pos));
+                            dexcom_hist[pos].gl_mgdl    = (float)hval->valuedouble;
+                            dexcom_hist[pos].timestamp  = hts;
+                            hist_count++;
+                        }
+                        memcpy(glucose_data.history, dexcom_hist,
+                               sizeof(glucose_history_point_t) * hist_count);
+                        glucose_data.history_count = (uint8_t)hist_count;
+
                         success = true;
                     }
                 }
@@ -436,6 +452,7 @@ bool fetch_dexcom_glucose()
                     release_shared_buffer(dexcom_response_buffer);
                     dexcom_response_buffer = NULL;
                     release_ssl_semaphore();
+                    update_cgm_graph();
                     return true; // Success, exit loop
                 }
             }
