@@ -13,6 +13,7 @@
 #include "f-membuffer.h"
 #include "f-nightscout.h"
 #include "cJSON.h"
+#include "f-display.h"
 
 static const char *TAG = "f-nightscout";
 
@@ -20,6 +21,7 @@ extern glucose_data_t glucose_data;
 
 static char *nightscout_response_buffer = NULL;
 static int nightscout_response_len = 0;
+static size_t nightscout_response_buf_size = HTTP_BUFFER_SIZE;
 static esp_http_client_handle_t nightscout_client = NULL;
 bool nightscout_client_initialized = false;
 
@@ -38,10 +40,10 @@ static esp_err_t nightscout_http_event_handler(esp_http_client_event_t *evt)
             return ESP_FAIL;
         }
         if (evt->data_len <= 0 || nightscout_response_len < 0 ||
-            (nightscout_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
+            (nightscout_response_len + evt->data_len) >= (int)nightscout_response_buf_size)
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
-                        nightscout_response_len, evt->data_len, HTTP_BUFFER_SIZE);
+                        nightscout_response_len, evt->data_len, (int)nightscout_response_buf_size);
             nightscout_response_len = 0;
             return ESP_FAIL;
         }
@@ -167,7 +169,7 @@ bool fetch_nightscout_glucose(void)
     url_buf[sizeof(url_buf) - 1] = '\0';
     if (base_len > 0 && url_buf[base_len - 1] == '/')
         url_buf[base_len - 1] = '\0';
-    strncat(url_buf, "/api/v1/entries.json?count=2", sizeof(url_buf) - strlen(url_buf) - 1);
+    strncat(url_buf, "/api/v1/entries.json?count=25", sizeof(url_buf) - strlen(url_buf) - 1);
 
     char api_secret_hex[41];
     // only set api-secret if password is set
@@ -186,7 +188,8 @@ bool fetch_nightscout_glucose(void)
         return false;
     }
 
-    nightscout_response_buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "NIGHTSCOUT_HTTP");
+    nightscout_response_buf_size = HTTP_BUFFER_SIZE * 2;
+    nightscout_response_buffer = get_shared_buffer(nightscout_response_buf_size, "NIGHTSCOUT_HTTP");
     if (!nightscout_response_buffer)
     {
         release_ssl_semaphore();
@@ -205,12 +208,11 @@ bool fetch_nightscout_glucose(void)
         if (status_code == 200 && nightscout_response_len > 0)
         {
             cJSON *root = cJSON_Parse(nightscout_response_buffer);
-            if (root && cJSON_IsArray(root) && cJSON_GetArraySize(root) >= 1)
+            int arr_size = root && cJSON_IsArray(root) ? cJSON_GetArraySize(root) : 0;
+            if (arr_size >= 1)
             {
-                cJSON *latest = cJSON_GetArrayItem(root, 0);
-                cJSON *previous = cJSON_GetArraySize(root) > 1 ? cJSON_GetArrayItem(root, 1) : NULL;
-
-                cJSON *sgv = cJSON_GetObjectItem(latest, "sgv");
+                cJSON *latest    = cJSON_GetArrayItem(root, 0);
+                cJSON *sgv       = cJSON_GetObjectItem(latest, "sgv");
                 cJSON *date_item = cJSON_GetObjectItem(latest, "date");
                 cJSON *direction = cJSON_GetObjectItem(latest, "direction");
 
@@ -224,12 +226,13 @@ bool fetch_nightscout_glucose(void)
                         ts = (time_t)(atoll(date_item->valuestring) / 1000);
 
                     glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
-                    glucose_data.current_gl_mgdl = value;
-                    glucose_data.timestamp = ts;
+                    glucose_data.current_gl_mgdl  = value;
+                    glucose_data.timestamp        = ts;
 
-                    if (previous)
+                    /* Previous reading for delta */
+                    if (arr_size > 1)
                     {
-                        cJSON *prev_sgv = cJSON_GetObjectItem(previous, "sgv");
+                        cJSON *prev_sgv = cJSON_GetObjectItem(cJSON_GetArrayItem(root, 1), "sgv");
                         if (cJSON_IsNumber(prev_sgv))
                             glucose_data.previous_gl_mgdl = (float)prev_sgv->valuedouble;
                     }
@@ -237,17 +240,49 @@ bool fetch_nightscout_glucose(void)
                     {
                         glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
                     }
-
-                    glucose_data.gl_diff = glucose_data.current_gl_mgdl - glucose_data.previous_gl_mgdl;
+                    glucose_data.gl_diff     = glucose_data.current_gl_mgdl - glucose_data.previous_gl_mgdl;
                     glucose_data.trend_arrow = direction_to_trend(cJSON_IsString(direction) ? direction->valuestring : NULL);
+
+                    /* --- Fill history (all entries, insertion-sorted oldest first) --- */
+                    time_t now_ts = time(NULL);
+                    int hist_count = 0;
+                    static glucose_history_point_t ns_hist[GLUCOSE_HISTORY_MAX];
+                    for (int hi = 0; hi < arr_size && hist_count < GLUCOSE_HISTORY_MAX; hi++)
+                    {
+                        cJSON *item  = cJSON_GetArrayItem(root, hi);
+                        cJSON *hsgv  = cJSON_GetObjectItem(item, "sgv");
+                        cJSON *hdate = cJSON_GetObjectItem(item, "date");
+                        if (!cJSON_IsNumber(hsgv)) continue;
+                        time_t hts = 0;
+                        if (cJSON_IsNumber(hdate))
+                            hts = (time_t)((int64_t)(hdate->valuedouble) / 1000);
+                        else if (cJSON_IsString(hdate))
+                            hts = (time_t)(atoll(hdate->valuestring) / 1000);
+                        if (hts <= 0) continue;
+                        int32_t age_m = (int32_t)((now_ts - hts) / 60);
+                        if (age_m < 0 || age_m >= GLUCOSE_HISTORY_MINUTES) continue;
+                        /* Insertion sort: oldest first */
+                        int pos = hist_count;
+                        while (pos > 0 && ns_hist[pos - 1].timestamp > hts) pos--;
+                        memmove(&ns_hist[pos + 1], &ns_hist[pos],
+                                sizeof(glucose_history_point_t) * (hist_count - pos));
+                        ns_hist[pos].gl_mgdl   = (float)hsgv->valuedouble;
+                        ns_hist[pos].timestamp = hts;
+                        hist_count++;
+                    }
+                    memcpy(glucose_data.history, ns_hist,
+                           sizeof(glucose_history_point_t) * hist_count);
+                    glucose_data.history_count = (uint8_t)hist_count;
+
+                    update_cgm_graph();
                     success = true;
 
                     if (eeprom_glucose_unit == 1)
-                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.1f mmol/L trend %i",
-                                    glucose_data.current_gl_mgdl / 18.0182f, glucose_data.trend_arrow);
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.1f mmol/L trend %i hist=%d",
+                                    glucose_data.current_gl_mgdl / 18.0182f, glucose_data.trend_arrow, hist_count);
                     else
-                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.0f mg/dL trend %i",
-                                    glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.0f mg/dL trend %i hist=%d",
+                                    glucose_data.current_gl_mgdl, glucose_data.trend_arrow, hist_count);
                 }
             }
             if (root)

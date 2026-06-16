@@ -631,9 +631,18 @@ function navigateToSection() {
             fetchStatus(true);
             window.sectionsInitialized.status = true;
         } else if (hash === 'screen' && !window.sectionsInitialized.screen) {
-            setupScreenSection();
-            fetchScreenLayout();
             window.sectionsInitialized.screen = true;
+            setupScreenSection();
+            showSectionLoader('screen');
+            fetchScreenLayout()
+                .catch(err => console.error('fetchScreenLayout error:', err))
+                .finally(() => {
+                    hideSectionLoader('screen');
+                    /* Re-render canvas now that it is visible and has real dimensions */
+                    requestAnimationFrame(() => {
+                        if (typeof renderScreenCanvas === 'function') renderScreenCanvas();
+                    });
+                });
         } else if (hash === 'files') {
             setupFilesSection();
             fetchFiles();
@@ -658,6 +667,10 @@ function navigateToSection() {
             setupScreenSection();
             refreshScreenLayoutSelect();
             hideSectionLoader('screen');
+            /* Re-render now that section children are visible again */
+            requestAnimationFrame(() => {
+                if (typeof renderScreenCanvas === 'function') renderScreenCanvas();
+            });
         }
     }
 }

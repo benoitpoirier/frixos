@@ -11,6 +11,7 @@
 #include "f-freestyle.h"
 #include "f-integrations.h"
 #include "f-membuffer.h"
+#include "f-display.h"
 
 static const char *TAG = "f-freestyle";
 #define LIBRE_CLIENT_VERSION "4.20.0"
@@ -50,8 +51,10 @@ static bool is_glucose_chunk_mode = false;
 static double latest_glucose_value = 0.0;
 static int latest_trend_arrow = 0;
 static time_t latest_timestamp = 0;
-// Small sliding window buffer for handling objects that span chunks (max measurement object ~500 bytes)
-#define GLUCOSE_CHUNK_BUFFER_SIZE 1024
+static glucose_history_point_t temp_history[GLUCOSE_HISTORY_MAX];
+static uint8_t temp_history_count = 0;
+// Sliding window buffer - use full HTTP_BUFFER_SIZE to capture graphData history entries
+#define GLUCOSE_CHUNK_BUFFER_SIZE HTTP_BUFFER_SIZE
 static char *glucose_chunk_buffer = NULL;
 static int glucose_chunk_buffer_len = 0;
 
@@ -309,130 +312,159 @@ static void process_glucose_chunk(const char *chunk, int len)
         glucose_chunk_buffer[glucose_chunk_buffer_len] = '\0';
     }
     
-    // Search for "glucoseMeasurement" objects in the current buffer
-    // Process all occurrences, keeping the latest one (by timestamp)
-    // Handle objects that may span across chunks by using the sliding window buffer
-    char *search_pos = glucose_chunk_buffer;
-    char *buffer_end = glucose_chunk_buffer + glucose_chunk_buffer_len;
-    
-    while ((search_pos = strstr(search_pos, "\"glucoseMeasurement\"")) != NULL)
+    // Search for any object containing "ValueInMgPerDl" or "ValueInMmolPerl".
+    // This covers both connection.glucoseMeasurement (current reading) and
+    // graphData array entries (historical readings) in the /graph response.
+    char *buffer_start = glucose_chunk_buffer;
+    char *buffer_end   = glucose_chunk_buffer + glucose_chunk_buffer_len;
+    char *search_pos   = buffer_start;
+
+    while (search_pos < buffer_end)
     {
-        // Find the opening brace of the glucoseMeasurement object
-        // In JSON: "glucoseMeasurement": { ... }
-        // Look for ':' after "glucoseMeasurement", then '{' after that
-        char *colon_pos = search_pos;
-        while (colon_pos < buffer_end && *colon_pos != ':')
-            colon_pos++;
-        
-        if (colon_pos >= buffer_end)
+        // Find the next occurrence of either value field
+        char *mgdl_field  = strstr(search_pos, "\"ValueInMgPerDl\"");
+        char *mmol_field  = strstr(search_pos, "\"ValueInMmolPerl\"");
+
+        char *found_field;
+        bool  is_mmol;
+        if (mgdl_field && mmol_field)
         {
-            // Colon not found yet (might be in next chunk), skip for now
-            search_pos++;
+            if (mgdl_field <= mmol_field) { found_field = mgdl_field; is_mmol = false; }
+            else                          { found_field = mmol_field; is_mmol = true;  }
+        }
+        else if (mgdl_field) { found_field = mgdl_field; is_mmol = false; }
+        else if (mmol_field) { found_field = mmol_field; is_mmol = true;  }
+        else break; // no more value fields in buffer
+
+        // Scan backward from the value field to find the enclosing '{'
+        char *obj_start = found_field;
+        while (obj_start > buffer_start && *obj_start != '{')
+            obj_start--;
+        if (*obj_start != '{')
+        {
+            search_pos = found_field + 1;
             continue;
         }
-        
-        // Look for '{' after the colon (skip whitespace)
-        char *obj_start = colon_pos + 1;
-        while (obj_start < buffer_end && (*obj_start == ' ' || *obj_start == '\t' || *obj_start == '\n' || *obj_start == '\r'))
-            obj_start++;
-        
-        if (obj_start >= buffer_end || *obj_start != '{')
-        {
-            // Opening brace not found yet (might be in next chunk), skip for now
-            search_pos++;
-            continue;
-        }
-        
+
         // Find the matching closing brace
         char *obj_end = find_matching_brace(obj_start, buffer_end);
         if (!obj_end)
         {
-            // Object spans beyond current buffer - it will be processed when more chunks arrive
-            // Don't skip it completely, but we can't process it yet
-            // The sliding window buffer will preserve it for the next chunk
-            search_pos++;
+            // Object not yet complete - wait for more data
+            break;
+        }
+
+        // Sanity: our value field must be inside the found object
+        if (found_field >= obj_end)
+        {
+            search_pos = found_field + 1;
             continue;
         }
-        
-        // We have a complete glucoseMeasurement object - extract values
+
+        // Extract glucose value
         double glucose_value = 0.0;
-        int trend_arrow = 0;
-        time_t timestamp = 0;
-        bool has_valid_value = false;
-        
-        // Try to extract ValueInMgPerDl
-        char *value_field = strstr(obj_start, "\"ValueInMgPerDl\"");
-        if (value_field && value_field < obj_end)
+        bool   has_valid_value = false;
+
+        if (!is_mmol)
         {
-            glucose_value = extract_numeric_value(value_field, obj_end);
-            if (glucose_value > 0 && glucose_value < 1000) // Reasonable range check
+            glucose_value = extract_numeric_value(found_field, obj_end);
+            if (glucose_value > 0 && glucose_value < 1000)
+                has_valid_value = true;
+        }
+        else
+        {
+            double glucose_mmol = extract_numeric_value(found_field, obj_end);
+            if (glucose_mmol > 0 && glucose_mmol < 100)
             {
+                glucose_value = glucose_mmol * 18.0182;
                 has_valid_value = true;
             }
         }
-        
-        // If ValueInMgPerDl not found, try ValueInMmolPerl and convert to mg/dL
-        if (!has_valid_value)
-        {
-            value_field = strstr(obj_start, "\"ValueInMmolPerl\"");
-            if (value_field && value_field < obj_end)
-            {
-                double glucose_mmol = extract_numeric_value(value_field, obj_end);
-                if (glucose_mmol > 0 && glucose_mmol < 100) // Reasonable range check for mmol/L
-                {
-                    // Convert mmol/L to mg/dL: mg/dL = mmol/L * 18.0182
-                    glucose_value = glucose_mmol * 18.0182;
-                    has_valid_value = true;
-                }
-            }
-        }
-        
-        // Extract TrendArrow from the same glucoseMeasurement object
+
         if (has_valid_value)
         {
+            // Extract TrendArrow
+            int trend_arrow = 0;
             char *trend_field = strstr(obj_start, "\"TrendArrow\"");
             if (trend_field && trend_field < obj_end)
             {
                 double trend_val = extract_numeric_value(trend_field, obj_end);
                 trend_arrow = (int)trend_val;
             }
-            
-            // Extract FactoryTimestamp (UTC) from the same glucoseMeasurement object
+
+            // Extract FactoryTimestamp (UTC) with fallback to Timestamp
+            time_t timestamp = 0;
             char *timestamp_field = strstr(obj_start, "\"FactoryTimestamp\"");
-            if (!timestamp_field || timestamp_field >= obj_end)
-            {
-                // Fallback to legacy Timestamp field
+            bool   is_utc = (timestamp_field && timestamp_field < obj_end);
+            if (!is_utc)
                 timestamp_field = strstr(obj_start, "\"Timestamp\"");
-            }
-            
+
             if (timestamp_field && timestamp_field < obj_end)
             {
                 char timestamp_str[64];
                 if (extract_string_value(timestamp_field, obj_end, timestamp_str, sizeof(timestamp_str)))
                 {
-                    // Check if this is FactoryTimestamp (UTC) or legacy Timestamp
-                    if (strstr(timestamp_field, "\"FactoryTimestamp\"") != NULL)
-                    {
-                        timestamp = parse_utc_timestamp(timestamp_str);
-                    }
-                    else
-                    {
-                        // Legacy Timestamp format
-                        timestamp = parse_freestyle_timestamp(timestamp_str);
-                    }
+                    timestamp = is_utc ? parse_utc_timestamp(timestamp_str)
+                                       : parse_freestyle_timestamp(timestamp_str);
                 }
             }
-            
-            // Update latest values if this measurement is newer (or if we don't have one yet)
-            if (timestamp > latest_timestamp || latest_timestamp == 0)
+
+            if (timestamp > 0)
             {
-                latest_glucose_value = glucose_value;
-                latest_trend_arrow = trend_arrow;
-                latest_timestamp = timestamp;
+                // Only keep readings within the graph display window
+                time_t now_ts = time(NULL);
+                int32_t age_min = (int32_t)((now_ts - timestamp) / 60);
+                bool within_window = (age_min >= 0 && age_min < GLUCOSE_HISTORY_MINUTES);
+
+                if (within_window)
+                {
+                    // Deduplicate by timestamp before adding to history
+                    bool already_present = false;
+                    for (int i = 0; i < temp_history_count; i++)
+                    {
+                        if (temp_history[i].timestamp == timestamp)
+                        {
+                            already_present = true;
+                            break;
+                        }
+                    }
+                    if (!already_present)
+                    {
+                        if (temp_history_count < GLUCOSE_HISTORY_MAX)
+                        {
+                            temp_history[temp_history_count].gl_mgdl = (float)glucose_value;
+                            temp_history[temp_history_count].timestamp = timestamp;
+                            temp_history_count++;
+                        }
+                        else
+                        {
+                            // Replace the oldest entry if this reading is newer
+                            int oldest_idx = 0;
+                            for (int i = 1; i < GLUCOSE_HISTORY_MAX; i++)
+                            {
+                                if (temp_history[i].timestamp < temp_history[oldest_idx].timestamp)
+                                    oldest_idx = i;
+                            }
+                            if (timestamp > temp_history[oldest_idx].timestamp)
+                            {
+                                temp_history[oldest_idx].gl_mgdl  = (float)glucose_value;
+                                temp_history[oldest_idx].timestamp = timestamp;
+                            }
+                        }
+                    }
+                } // within_window
+
+                // Track the most recent reading for current glucose value
+                if (timestamp > latest_timestamp || latest_timestamp == 0)
+                {
+                    latest_glucose_value = glucose_value;
+                    latest_trend_arrow   = trend_arrow;
+                    latest_timestamp     = timestamp;
+                }
             }
         }
-        
-        // Move search position past the end of this object to find next occurrence
+
+        // Advance past this object to find the next one
         search_pos = obj_end + 1;
     }
 }
@@ -900,6 +932,7 @@ bool fetch_freestyle_glucose(void)
         latest_glucose_value = 0.0;
         latest_trend_arrow = 0;
         latest_timestamp = 0;
+        temp_history_count = 0;
 
         // Update URL and method for this request
         esp_http_client_set_url(freestyle_client, graph_url);
@@ -946,6 +979,28 @@ bool fetch_freestyle_glucose(void)
                     {
                         time(&glucose_data.timestamp); // Fallback to current time if parsing failed
                     }
+                    
+                    // Sort temp_history chronologically (oldest first) so the graph
+                    // draws left=oldest to right=newest.
+                    for (int si = 1; si < temp_history_count; si++)
+                    {
+                        glucose_history_point_t key = temp_history[si];
+                        int sj = si - 1;
+                        while (sj >= 0 && temp_history[sj].timestamp > key.timestamp)
+                        {
+                            temp_history[sj + 1] = temp_history[sj];
+                            sj--;
+                        }
+                        temp_history[sj + 1] = key;
+                    }
+
+                    // Copy history to final struct
+                    memcpy(glucose_data.history, temp_history, sizeof(glucose_history_point_t) * temp_history_count);
+                    glucose_data.history_count = temp_history_count;
+
+                    // Refresh CGM graph immediately with the new data
+                    update_cgm_graph();
+
                     success = true; // Data was updated
                     if (eeprom_glucose_unit == 1)
                     {

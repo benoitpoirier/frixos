@@ -538,17 +538,19 @@ function getPreviewImageUrl(def, inMatrix) {
 }
 
 const SCREEN_ELEMENT_DEFS = [
-    { id: 'glucose_level', label: 'Glucose Level', w: 14, h: 20, img: 'default-glucose.jpg' },
-    { id: 'glucose_trend', label: 'Glucose Trend', w: 12, h: 14, img: 'default-trend.jpg' },
-    { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'default-wifi-off.jpg' },
-    { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'default-weather.jpg' },
-    { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg' },
-    { id: 'time', label: 'Digit Display', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label },
-    { id: 'time_aux', label: 'Digit Display (Aux)', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux },
-    { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
-    { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
+    { id: 'time',            label: 'Digit Display',       w: 80,  h: 36, img: 'bold.jpg', paletteFitFullImage: true },
+    { id: 'time_aux',        label: 'Digit Display (Aux)', w: 80,  h: 36, img: 'bold.jpg', paletteFitFullImage: true },
+    { id: 'ampm',            label: 'AM/PM',               w: 10,  h: 20, img: 'default-ampm.jpg' },
+    { id: 'digit_label',     label: 'Digit Label',         w: 80,  h:  8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label },
+    { id: 'digit_label_aux', label: 'Digit Label (Aux)',   w: 80,  h:  8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux },
+    { id: 'message',         label: 'Scrolling Message',   w: 128, h:  8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
+    { id: 'weather',         label: 'Weather',             w: 32,  h: 22, img: 'default-weather.jpg' },
+    { id: 'moon',            label: 'Moon',                w: 14,  h: 14, img: 'default-moon.jpg' },
+    /* text_1..text_8 inserted here at runtime by getScreenPaletteDefs */
+    { id: 'cgm_graph',       label: 'Glucose Graph',       w: 90,  h: 34, img: 'default-trend.jpg' },
+    { id: 'glucose_level',   label: 'Glucose Level',       w: 14,  h: 20, img: 'default-glucose.jpg' },
+    { id: 'glucose_trend',   label: 'Glucose Trend',       w: 12,  h: 14, img: 'default-trend.jpg' },
+    { id: 'wifi_off',        label: 'WiFi off',            w: 20,  h: 20, img: 'default-wifi-off.jpg' },
     { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
     { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
     { id: 'text_3', label: 'Text 3', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
@@ -633,11 +635,17 @@ function getScreenPaletteDefs() {
             }
         });
     }
-    const items = [...base, ...enabledTextItems, SCREEN_PALETTE_GRID_DEF];
-    if (getNextTextSlot(profile) !== null) {
-        items.push(SCREEN_PALETTE_TEXT_DEF);
-    }
-    return items;
+    // Insert text items (+ add-text button) after 'moon', before 'cgm_graph'
+    const moonIdx = base.findIndex(d => d.id === 'moon');
+    const insertAt = moonIdx >= 0 ? moonIdx + 1 : base.length;
+    const textSlotItems = [...enabledTextItems];
+    if (getNextTextSlot(profile) !== null) textSlotItems.push(SCREEN_PALETTE_TEXT_DEF);
+    return [
+        ...base.slice(0, insertAt),
+        ...textSlotItems,
+        ...base.slice(insertAt),
+        SCREEN_PALETTE_GRID_DEF
+    ];
 }
 
 function isScreenGridElement(id) {
@@ -728,10 +736,16 @@ const SCREEN_LAYOUT_VERSION = 9;
 
 /* Compact binary wire format for /api/screen (must match f-screen-layout-bin.h). */
 const SCREEN_BIN_MAGIC = 0x4653584C;
-const SCREEN_BIN_FORMAT = 1;
+const SCREEN_BIN_FORMAT = 4;
+const SCREEN_BIN_FORMAT_V3 = 3;        /* previous format */
+const SCREEN_BIN_FORMAT_V2 = 2;
+const SCREEN_BIN_FORMAT_V1 = 1;        /* legacy format for loading old .layout files */
 const SCREEN_BIN_FONT_LEN = 12;
-const SCREEN_BIN_WIDGET_SIZE = 13;
-const SCREEN_BIN_WIDGET_COUNT = 19;
+const SCREEN_BIN_WIDGET_SIZE = 25;     /* current (format 4) */
+const SCREEN_BIN_WIDGET_SIZE_V3 = 22;  /* format 3 */
+const SCREEN_BIN_WIDGET_SIZE_V2 = 16;  /* format 2 */
+const SCREEN_BIN_WIDGET_SIZE_V1 = 13;  /* format 1 (legacy) */
+const SCREEN_BIN_WIDGET_COUNT = 20;
 const SCREEN_BIN_SCROLL_LEN = 512;
 const SCREEN_BIN_STATIC_TEXT_LEN = 96;
 const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
@@ -742,13 +756,29 @@ const SCREEN_BIN_PROFILE_SIZE =
     SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN +
     SCREEN_BIN_STATIC_TEXT_LEN * 2;
 const SCREEN_BIN_WIRE_SIZE = SCREEN_BIN_HEADER_SIZE + SCREEN_BIN_PROFILE_SIZE * 2;
+/* Legacy wire sizes for backward compat when loading .layout files */
+const SCREEN_BIN_WIRE_SIZE_V3 = SCREEN_BIN_HEADER_SIZE
+    + (SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE_V3
+       + SCREEN_BIN_SCROLL_LEN
+       + SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN
+       + SCREEN_BIN_STATIC_TEXT_LEN * 2) * 2;  /* = 3888 */
+const SCREEN_BIN_WIRE_SIZE_V2 = SCREEN_BIN_HEADER_SIZE
+    + (SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE_V2
+       + SCREEN_BIN_SCROLL_LEN
+       + SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN
+       + SCREEN_BIN_STATIC_TEXT_LEN * 2) * 2;  /* = 3648 */
+const SCREEN_BIN_WIRE_SIZE_V1 = SCREEN_BIN_HEADER_SIZE
+    + (SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE_V1
+       + SCREEN_BIN_SCROLL_LEN
+       + SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN
+       + SCREEN_BIN_STATIC_TEXT_LEN * 2) * 2;  /* = 3528 */
 const SCREEN_BIN_MIME = 'application/vnd.frixos.screen-layout+1';
 
 /* Firmware widget[] index order (screen_element_id_t). */
 const SCREEN_WIRE_ELEM_IDS = [
     'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'time', 'message',
     'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8',
-    'ampm', 'time_aux', 'digit_label', 'digit_label_aux'
+    'ampm', 'time_aux', 'digit_label', 'digit_label_aux', 'cgm_graph'
 ];
 
 function screenHexToRgb(hex, fallback) {
@@ -787,44 +817,62 @@ function screenFindProfileElement(profile, id) {
     return elem;
 }
 
-function screenReadWidget(view, offset) {
+function screenReadWidget(view, offset, widget_size) {
+    const ws = widget_size || SCREEN_BIN_WIDGET_SIZE;
     return {
         enabled: view.getUint8(offset) ? 1 : 0,
         x: view.getUint8(offset + 1),
         y: view.getUint8(offset + 2),
         z: view.getUint8(offset + 3),
-        font: view.getUint8(offset + 4),
-        width: view.getUint8(offset + 5),
-        align: view.getUint8(offset + 6),
+        font:    view.getUint8(offset + 4),
+        width:   view.getUint8(offset + 5),
+        align:   view.getUint8(offset + 6),
         color_r: view.getUint8(offset + 7),
         color_g: view.getUint8(offset + 8),
         color_b: view.getUint8(offset + 9),
-        bg_r: view.getUint8(offset + 10),
-        bg_g: view.getUint8(offset + 11),
-        bg_b: view.getUint8(offset + 12)
+        bg_r:    view.getUint8(offset + 10),
+        bg_g:    view.getUint8(offset + 11),
+        bg_b:    view.getUint8(offset + 12),
+        warn_r:  ws >= 16 ? view.getUint8(offset + 13) : 0,
+        warn_g:  ws >= 16 ? view.getUint8(offset + 14) : 0,
+        warn_b:  ws >= 16 ? view.getUint8(offset + 15) : 0,
+        label_r: ws >= 22 ? view.getUint8(offset + 16) : 0,
+        label_g: ws >= 22 ? view.getUint8(offset + 17) : 0,
+        label_b: ws >= 22 ? view.getUint8(offset + 18) : 0,
+        axis_r:  ws >= 22 ? view.getUint8(offset + 19) : 0,
+        axis_g:  ws >= 22 ? view.getUint8(offset + 20) : 0,
+        axis_b:  ws >= 22 ? view.getUint8(offset + 21) : 0,
+        band_r:  ws >= 25 ? view.getUint8(offset + 22) : 0,
+        band_g:  ws >= 25 ? view.getUint8(offset + 23) : 0,
+        band_b:  ws >= 25 ? view.getUint8(offset + 24) : 0
     };
 }
 
 function screenWriteWidget(view, offset, elem) {
-    const opts = elem && elem.options ? elem.options : {};
-    const fg = screenHexToRgb(opts.color, { r: 255, g: 255, b: 255 });
-    const bg = screenHexToRgb(opts.bg_color, { r: 0, g: 0, b: 0 });
-    view.setUint8(offset, elem && elem.enabled ? 1 : 0);
-    view.setUint8(offset + 1, elem && elem.x != null ? elem.x : 0);
-    view.setUint8(offset + 2, elem && elem.y != null ? elem.y : 0);
-    view.setUint8(offset + 3, elem && elem.z != null ? elem.z : 0);
-    view.setUint8(offset + 4, opts.font != null ? opts.font : 0);
-    view.setUint8(offset + 5, opts.width != null ? opts.width : 0);
-    view.setUint8(offset + 6, opts.align != null ? opts.align : 0);
-    view.setUint8(offset + 7, fg.r);
-    view.setUint8(offset + 8, fg.g);
-    view.setUint8(offset + 9, fg.b);
-    view.setUint8(offset + 10, bg.r);
-    view.setUint8(offset + 11, bg.g);
-    view.setUint8(offset + 12, bg.b);
+    const opts  = elem && elem.options ? elem.options : {};
+    const fg    = screenHexToRgb(opts.color,       { r: 255, g: 255, b: 255 });
+    const bg    = screenHexToRgb(opts.bg_color,    { r: 0,   g: 0,   b: 0 });
+    const warn  = screenHexToRgb(opts.warn_color,  { r: 0,   g: 0,   b: 0 });
+    const lbl   = screenHexToRgb(opts.label_color, { r: 0,   g: 0,   b: 0 });
+    const axis  = screenHexToRgb(opts.axis_color,  { r: 0,   g: 0,   b: 0 });
+    const band  = screenHexToRgb(opts.band_color,  { r: 0,   g: 0,   b: 0 });
+    view.setUint8(offset,      elem && elem.enabled  ? 1 : 0);
+    view.setUint8(offset + 1,  elem && elem.x != null ? elem.x : 0);
+    view.setUint8(offset + 2,  elem && elem.y != null ? elem.y : 0);
+    view.setUint8(offset + 3,  elem && elem.z != null ? elem.z : 0);
+    view.setUint8(offset + 4,  opts.font  != null ? opts.font  : 0);
+    view.setUint8(offset + 5,  opts.width != null ? opts.width : 0);
+    view.setUint8(offset + 6,  opts.align != null ? opts.align : 0);
+    view.setUint8(offset + 7,  fg.r);  view.setUint8(offset + 8,  fg.g);  view.setUint8(offset + 9,  fg.b);
+    view.setUint8(offset + 10, bg.r);  view.setUint8(offset + 11, bg.g);  view.setUint8(offset + 12, bg.b);
+    view.setUint8(offset + 13, warn.r); view.setUint8(offset + 14, warn.g); view.setUint8(offset + 15, warn.b);
+    view.setUint8(offset + 16, lbl.r);  view.setUint8(offset + 17, lbl.g);  view.setUint8(offset + 18, lbl.b);
+    view.setUint8(offset + 19, axis.r); view.setUint8(offset + 20, axis.g); view.setUint8(offset + 21, axis.b);
+    view.setUint8(offset + 22, band.r); view.setUint8(offset + 23, band.g); view.setUint8(offset + 24, band.b);
 }
 
-function screenWireProfileToJson(view, offset) {
+function screenWireProfileToJson(view, offset, widget_size) {
+    const ws = widget_size || SCREEN_BIN_WIDGET_SIZE;
     const profile = {
         elements: [],
         scroll_text: '',
@@ -833,8 +881,8 @@ function screenWireProfileToJson(view, offset) {
     let off = offset;
 
     SCREEN_WIRE_ELEM_IDS.forEach(id => {
-        const w = screenReadWidget(view, off);
-        off += SCREEN_BIN_WIDGET_SIZE;
+        const w = screenReadWidget(view, off, ws);
+        off += ws;
         const elem = { id, enabled: w.enabled, x: w.x, y: w.y, z: w.z };
         if (isScreenTextElement(id)) {
             elem.options = {
@@ -846,6 +894,35 @@ function screenWireProfileToJson(view, offset) {
                 elem.options.width = w.width;
                 elem.options.align = w.align;
             }
+        } else if (id === 'cgm_graph') {
+            /* height: encoded as (40-h) in bits[5:1] of font byte */
+            const h_enc      = (w.font >> 1) & 0x1F;
+            const graph_height = Math.max(28, Math.min(40, 40 - h_enc));
+            const show_markers = !!(w.font & 0x01);
+            const graph_width  = w.width || 100;
+            /* time scale: stored as (min/10) in align byte, 0 = default 180 */
+            const time_scale   = w.align ? w.align * 10 : 180;
+            const ok_color     = (w.color_r || w.color_g || w.color_b)
+                                 ? screenRgbToHex(w.color_r, w.color_g, w.color_b) : '#00cc00';
+            const danger_color = (w.bg_r || w.bg_g || w.bg_b)
+                                 ? screenRgbToHex(w.bg_r, w.bg_g, w.bg_b) : '#ff0000';
+            const warn_color   = (w.warn_r || w.warn_g || w.warn_b)
+                                 ? screenRgbToHex(w.warn_r, w.warn_g, w.warn_b) : '#ff8800';
+            const label_color  = (w.label_r || w.label_g || w.label_b)
+                                 ? screenRgbToHex(w.label_r, w.label_g, w.label_b) : '#ffffff';
+            const axis_color   = (w.axis_r || w.axis_g || w.axis_b)
+                                 ? screenRgbToHex(w.axis_r, w.axis_g, w.axis_b) : '#777777';
+            const band_color   = (w.band_r || w.band_g || w.band_b)
+                                 ? screenRgbToHex(w.band_r, w.band_g, w.band_b) : '#003300';
+            elem.options = {
+                show_markers, graph_width, graph_height, time_scale,
+                color: ok_color, bg_color: danger_color, warn_color,
+                label_color, axis_color, band_color,
+                /* packed encoded fields */
+                font:  (show_markers ? 1 : 0) | ((40 - graph_height) << 1),
+                width: graph_width,
+                align: Math.round(time_scale / 10)
+            };
         }
         profile.elements.push(elem);
     });
@@ -865,16 +942,26 @@ function screenWireProfileToJson(view, offset) {
 }
 
 function decodeScreenLayoutBinary(bytes) {
-    if (!bytes || bytes.byteLength !== SCREEN_BIN_WIRE_SIZE) {
-        throw new Error('invalid screen wire size');
-    }
+    if (!bytes) throw new Error('invalid screen wire size');
+    const size = bytes.byteLength;
+    const isV1 = size === SCREEN_BIN_WIRE_SIZE_V1;
+    const isV2 = size === SCREEN_BIN_WIRE_SIZE_V2;
+    const isV3 = size === SCREEN_BIN_WIRE_SIZE_V3;
+    const isV4 = size === SCREEN_BIN_WIRE_SIZE;
+    if (!isV1 && !isV2 && !isV3 && !isV4) throw new Error('invalid screen wire size');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (view.getUint32(0, true) !== SCREEN_BIN_MAGIC) {
         throw new Error('invalid screen wire magic');
     }
-    if (view.getUint8(4) !== SCREEN_BIN_FORMAT) {
+    const fmt = view.getUint8(4);
+    if (fmt !== SCREEN_BIN_FORMAT && fmt !== SCREEN_BIN_FORMAT_V3
+        && fmt !== SCREEN_BIN_FORMAT_V2 && fmt !== SCREEN_BIN_FORMAT_V1) {
         throw new Error('unsupported screen wire format');
     }
+    const ws = isV1 ? SCREEN_BIN_WIDGET_SIZE_V1
+             : isV2 ? SCREEN_BIN_WIDGET_SIZE_V2
+             : isV3 ? SCREEN_BIN_WIDGET_SIZE_V3
+             : SCREEN_BIN_WIDGET_SIZE;
 
     const layout = {
         version: view.getUint8(5),
@@ -891,9 +978,9 @@ function decodeScreenLayoutBinary(bytes) {
     };
 
     let off = SCREEN_BIN_HEADER_SIZE;
-    const day = screenWireProfileToJson(view, off);
+    const day = screenWireProfileToJson(view, off, ws);
     off = day.offset;
-    const night = screenWireProfileToJson(view, off);
+    const night = screenWireProfileToJson(view, off, ws);
     layout.profiles.day = day.profile;
     layout.profiles.night = night.profile;
     return layout;
@@ -1033,6 +1120,11 @@ function getScreenElementSize(def, elementState) {
         h = getScreenLabelBoxHeight(font);
         return { w: evenPx(w), h };
     }
+    if (def.id === 'cgm_graph' && elementState && elementState.options) {
+        w = elementState.options.graph_width  || def.w;
+        h = elementState.options.graph_height || def.h;
+        return { w: evenPx(w), h: evenPx(h) };
+    }
     w = def.w;
     h = def.h;
     return { w: evenPx(w), h: evenPx(h) };
@@ -1072,6 +1164,27 @@ function dedupeScreenProfileElements(profile) {
     });
 }
 
+function ensureScreenCgmGraphOptions(element) {
+    if (!element.options) element.options = {};
+    if (element.options.graph_width  == null) element.options.graph_width  = 90;
+    if (element.options.graph_height == null) element.options.graph_height = 34;
+    if (element.options.time_scale   == null) element.options.time_scale   = 180;
+    if (element.options.show_markers == null) element.options.show_markers = false;
+    if (!element.options.color)       element.options.color       = '#00cc00';
+    if (!element.options.bg_color)    element.options.bg_color    = '#ff0000';
+    if (!element.options.warn_color)  element.options.warn_color  = '#ff8800';
+    if (!element.options.label_color) element.options.label_color = '#ffffff';
+    if (!element.options.axis_color)  element.options.axis_color  = '#777777';
+    if (!element.options.band_color)  element.options.band_color  = '#003300';
+    /* Keep packed encoded fields in sync */
+    const gw = Math.min(120, Math.max(60, element.options.graph_width));
+    const gh = Math.min(40,  Math.max(28, element.options.graph_height));
+    const ts = Math.min(480, Math.max(60, element.options.time_scale));
+    element.options.font  = (element.options.show_markers ? 1 : 0) | ((40 - gh) << 1);
+    element.options.width = gw;
+    element.options.align = Math.round(ts / 10);
+}
+
 function ensureScreenProfileShape(profile) {
     if (!profile) return;
     if (!profile.elements) profile.elements = [];
@@ -1082,6 +1195,7 @@ function ensureScreenProfileShape(profile) {
         const element = ensureElementInProfile(profile, def.id);
         ensureElementLayer(element);
         if (isScreenTextElement(def.id)) ensureScreenTextOptions(element);
+        if (def.id === 'cgm_graph') ensureScreenCgmGraphOptions(element);
     });
     dedupeScreenProfileElements(profile);
 }
@@ -2305,6 +2419,168 @@ function renderScreenOptions() {
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
+    }
+
+    if (e.id === 'cgm_graph') {
+        ensureScreenCgmGraphOptions(e);
+
+        /* Width */
+        const widthRow = document.createElement('div');
+        widthRow.className = 'form-group';
+        const widthLabel = document.createElement('label');
+        widthLabel.textContent = 'Width (px, 60–120)';
+        const widthInput = document.createElement('input');
+        widthInput.type = 'number';
+        widthInput.min = '60';
+        widthInput.max = '120';
+        widthInput.value = String(e.options.graph_width || 90);
+        widthInput.addEventListener('change', () => {
+            e.options.graph_width = Math.min(120, Math.max(60, parseInt(widthInput.value, 10) || 90));
+            e.options.width = e.options.graph_width;
+            widthInput.value = String(e.options.graph_width);
+            ensureScreenCgmGraphOptions(e);
+            renderScreenCanvas();
+        });
+        widthRow.appendChild(widthLabel);
+        widthRow.appendChild(widthInput);
+        opt.appendChild(widthRow);
+
+        /* Height */
+        const heightRow = document.createElement('div');
+        heightRow.className = 'form-group';
+        const heightLabel = document.createElement('label');
+        heightLabel.textContent = 'Height (px, 28–40)';
+        const heightInput = document.createElement('input');
+        heightInput.type = 'number';
+        heightInput.min = '28';
+        heightInput.max = '40';
+        heightInput.value = String(e.options.graph_height || 34);
+        heightInput.addEventListener('change', () => {
+            e.options.graph_height = Math.min(40, Math.max(28, parseInt(heightInput.value, 10) || 34));
+            heightInput.value = String(e.options.graph_height);
+            ensureScreenCgmGraphOptions(e);
+            renderScreenCanvas();
+        });
+        heightRow.appendChild(heightLabel);
+        heightRow.appendChild(heightInput);
+        opt.appendChild(heightRow);
+
+        /* Time scale */
+        const tsRow = document.createElement('div');
+        tsRow.className = 'form-group';
+        const tsLabel = document.createElement('label');
+        tsLabel.textContent = 'Time scale (min, 60–480)';
+        const tsInput = document.createElement('input');
+        tsInput.type = 'number';
+        tsInput.min = '60';
+        tsInput.max = '480';
+        tsInput.step = '10';
+        tsInput.value = String(e.options.time_scale || 180);
+        tsInput.addEventListener('change', () => {
+            e.options.time_scale = Math.min(480, Math.max(60, parseInt(tsInput.value, 10) || 180));
+            e.options.align = Math.round(e.options.time_scale / 10);
+            tsInput.value = String(e.options.time_scale);
+        });
+        tsRow.appendChild(tsLabel);
+        tsRow.appendChild(tsInput);
+        opt.appendChild(tsRow);
+
+        /* Show markers */
+        const markRow = document.createElement('div');
+        markRow.className = 'checkbox-container';
+        const markInput = document.createElement('input');
+        markInput.type = 'checkbox';
+        markInput.id = 'cgm_show_markers';
+        markInput.checked = !!e.options.show_markers;
+        const markLabel = document.createElement('label');
+        markLabel.htmlFor = 'cgm_show_markers';
+        markLabel.textContent = 'Show axis markers';
+        markInput.addEventListener('change', () => {
+            e.options.show_markers = markInput.checked;
+            ensureScreenCgmGraphOptions(e);
+            renderScreenCanvas();
+        });
+        markRow.appendChild(markInput);
+        markRow.appendChild(markLabel);
+        opt.appendChild(markRow);
+
+        /* In-range color */
+        const okRow = document.createElement('div');
+        okRow.className = 'form-group';
+        const okLabel = document.createElement('label');
+        okLabel.textContent = 'In-range color';
+        const okInput = document.createElement('input');
+        okInput.type = 'color';
+        okInput.value = e.options.color || '#00cc00';
+        okInput.addEventListener('input', () => { e.options.color = okInput.value; });
+        okRow.appendChild(okLabel);
+        okRow.appendChild(okInput);
+        opt.appendChild(okRow);
+
+        /* Near-limit (warning) color */
+        const warnRow = document.createElement('div');
+        warnRow.className = 'form-group';
+        const warnLabel = document.createElement('label');
+        warnLabel.textContent = 'Near-limit color';
+        const warnInput = document.createElement('input');
+        warnInput.type = 'color';
+        warnInput.value = e.options.warn_color || '#ff8800';
+        warnInput.addEventListener('input', () => { e.options.warn_color = warnInput.value; });
+        warnRow.appendChild(warnLabel);
+        warnRow.appendChild(warnInput);
+        opt.appendChild(warnRow);
+
+        /* Out-of-range (danger) color */
+        const dangerRow = document.createElement('div');
+        dangerRow.className = 'form-group';
+        const dangerLabel = document.createElement('label');
+        dangerLabel.textContent = 'Out-of-range color';
+        const dangerInput = document.createElement('input');
+        dangerInput.type = 'color';
+        dangerInput.value = e.options.bg_color || '#ff0000';
+        dangerInput.addEventListener('input', () => { e.options.bg_color = dangerInput.value; });
+        dangerRow.appendChild(dangerLabel);
+        dangerRow.appendChild(dangerInput);
+        opt.appendChild(dangerRow);
+
+        /* Legend text color */
+        const lblRow = document.createElement('div');
+        lblRow.className = 'form-group';
+        const lblLabel = document.createElement('label');
+        lblLabel.textContent = 'Label text color';
+        const lblInput = document.createElement('input');
+        lblInput.type = 'color';
+        lblInput.value = e.options.label_color || '#ffffff';
+        lblInput.addEventListener('input', () => { e.options.label_color = lblInput.value; });
+        lblRow.appendChild(lblLabel);
+        lblRow.appendChild(lblInput);
+        opt.appendChild(lblRow);
+
+        /* Axis line color */
+        const axisRow = document.createElement('div');
+        axisRow.className = 'form-group';
+        const axisLabel = document.createElement('label');
+        axisLabel.textContent = 'Axis line color';
+        const axisInput = document.createElement('input');
+        axisInput.type = 'color';
+        axisInput.value = e.options.axis_color || '#777777';
+        axisInput.addEventListener('input', () => { e.options.axis_color = axisInput.value; });
+        axisRow.appendChild(axisLabel);
+        axisRow.appendChild(axisInput);
+        opt.appendChild(axisRow);
+
+        /* Tolerance band color */
+        const bandRow = document.createElement('div');
+        bandRow.className = 'form-group';
+        const bandLabel = document.createElement('label');
+        bandLabel.textContent = 'Tolerance band color';
+        const bandInput = document.createElement('input');
+        bandInput.type = 'color';
+        bandInput.value = e.options.band_color || '#003300';
+        bandInput.addEventListener('input', () => { e.options.band_color = bandInput.value; });
+        bandRow.appendChild(bandLabel);
+        bandRow.appendChild(bandInput);
+        opt.appendChild(bandRow);
     }
 }
 

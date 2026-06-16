@@ -419,6 +419,7 @@
     justify-self: start;
     flex: unset;
     max-width: none;
+    cursor: pointer;
 }
 
 .screen-options .form-group input[type="checkbox"] {
@@ -427,6 +428,15 @@
     margin: 0;
     justify-self: start;
     flex: unset;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+/* Checkbox-container rows inside screen-options inherit full-width flex layout;
+   indent them to roughly align with the second grid column for visual coherence */
+.screen-options .checkbox-container {
+    padding-left: 0;
+    margin-bottom: 8px;
 }
 
 .screen-options .form-group:has(textarea) {
@@ -536,9 +546,34 @@
 .schedule-slot-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 6px;
     flex-wrap: wrap;
+    padding: 6px 8px;
+    background: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.schedule-slot-row select,
+.schedule-slot-row input[type="number"],
+.schedule-slot-row input[type="text"] {
+    padding: 4px 6px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    font-family: inherit;
+}
+
+.schedule-slot-row select:focus,
+.schedule-slot-row input[type="number"]:focus,
+.schedule-slot-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 170, 255, 0.2);
 }
 
 .schedule-slot-row select {
@@ -553,7 +588,7 @@
 .schedule-slot-row .schedule-slot-sec {
     flex: 0 0 auto;
     color: var(--text-secondary);
-    font-size: 0.9em;
+    font-size: 0.85em;
 }
 
 .schedule-slot-row input[type="text"] {
@@ -581,11 +616,25 @@
 .schedule-slot-row button {
     flex: 0 0 auto;
     cursor: pointer;
-    padding: 2px 8px;
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid var(--error-color);
+    border-radius: 4px;
+    color: var(--error-color);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.schedule-slot-row button:hover {
+    background-color: var(--error-color);
+    color: #fff;
 }
 
 .screen-schedule-add {
-    margin-top: 4px;
+    margin-top: 6px;
+    font-size: 0.875rem;
+    padding: 6px 12px;
 }
 
 .screen-options-mode-note {

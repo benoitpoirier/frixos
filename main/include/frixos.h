@@ -136,6 +136,15 @@ extern uint8_t eeprom_board_rev;       // Board revision read from NVS (0=rev A-
 // LibreLinkUp settings
 extern uint8_t eeprom_libre_region;    // 0=disabled, 1=US, 2=Japan, 3=Rest of World
 
+#define GLUCOSE_HISTORY_MAX 100
+/* Width of the CGM time window in minutes. Must cover the maximum time_scale
+ * settable in the screen editor (480 min). */
+#define GLUCOSE_HISTORY_MINUTES 480
+typedef struct {
+    float gl_mgdl;
+    time_t timestamp;
+} glucose_history_point_t;
+
 // Unified glucose data structure (shared by both Dexcom and Freestyle)
 typedef struct {
     float current_gl_mgdl;
@@ -143,6 +152,8 @@ typedef struct {
     float gl_diff;
     int trend_arrow;  // 0=down fast, 1=down, 2=stable, 3=up, 4=up fast, -1=no arrow
     time_t timestamp;
+    glucose_history_point_t history[GLUCOSE_HISTORY_MAX];
+    uint8_t history_count;
 } glucose_data_t;
 
 extern glucose_data_t glucose_data;  // Unified glucose data storage
@@ -172,6 +183,7 @@ typedef enum {
     SLOT_TYPE_CGM          = 1,
     SLOT_TYPE_WEATHER_TEMP = 2,
     SLOT_TYPE_HA           = 3,
+    SLOT_TYPE_CGM_GRAPH    = 4,
 } slot_type_t;
 
 #define MAX_DISPLAY_SLOTS  8
@@ -266,6 +278,7 @@ typedef enum
   SCREEN_ELEM_TIME_AUX = 16,
   SCREEN_ELEM_DIGIT_LABEL = 17,
   SCREEN_ELEM_DIGIT_LABEL_AUX = 18,
+  SCREEN_ELEM_CGM_GRAPH = 19,
   SCREEN_ELEM_COUNT
 } screen_element_id_t;
 
@@ -275,16 +288,47 @@ typedef struct
   uint8_t x;       // 0..127 absolute screen coordinate
   uint8_t y;       // 0..127 absolute screen coordinate
   uint8_t z;       // 0..4 layer index, higher = on top
-  uint8_t font;    // 0..4 (8pt..16pt) for message/text elements
-  uint8_t width;   // static text clip width in pixels, 0 = no limit
-  uint8_t align;   // SCREEN_MSG_ALIGN_* for message/text elements
+  /* For text elements: font size 0..4.
+     For cgm_graph: bit 0 = show_markers (0=off, 1=on);
+                    bits[5:1] = (40 - graph_height), 0 = default 40 px. */
+  uint8_t font;
+  /* For text elements: clip width (0=no limit).
+     For cgm_graph: display width in px (40-120, 0=default 100). */
+  uint8_t width;
+  /* For text elements: alignment.
+     For cgm_graph: time_scale / 10  (0=default→180 min, range 6..48 → 60..480 min). */
+  uint8_t align;
+  /* For text elements: foreground color.
+     For cgm_graph: in-range (ok) color (0,0,0 => default #00CC00). */
   uint8_t color_r;
   uint8_t color_g;
   uint8_t color_b;
+  /* For text elements: background color.
+     For cgm_graph: out-of-range (danger) color (0,0,0 => default #FF0000). */
   uint8_t bg_r;
   uint8_t bg_g;
   uint8_t bg_b;
-} screen_widget_t;
+  /* For cgm_graph: near-limit (warning) color (0,0,0 => default #FF8800).
+     Reserved / zero for all other elements. */
+  uint8_t warn_r;
+  uint8_t warn_g;
+  uint8_t warn_b;
+  /* For cgm_graph: axis label text color (0,0,0 => default white #FFFFFF).
+     Reserved / zero for all other elements. */
+  uint8_t label_r;
+  uint8_t label_g;
+  uint8_t label_b;
+  /* For cgm_graph: axis line color (0,0,0 => default #777777).
+     Reserved / zero for all other elements. */
+  uint8_t axis_r;
+  uint8_t axis_g;
+  uint8_t axis_b;
+  /* For cgm_graph: tolerance band background color (0,0,0 => default #003300).
+     Reserved / zero for all other elements. */
+  uint8_t band_r;
+  uint8_t band_g;
+  uint8_t band_b;
+} screen_widget_t; // 25 bytes
 
 typedef struct
 {

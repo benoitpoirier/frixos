@@ -138,7 +138,7 @@ static void parse_display_schedule_into(display_slot_t *out_slots, int *out_coun
         if (!cJSON_IsNumber(t) || !cJSON_IsNumber(d)) continue;
 
         int type = t->valueint;
-        if (type < SLOT_TYPE_TIME || type > SLOT_TYPE_HA) continue;
+        if (type < SLOT_TYPE_TIME || type > SLOT_TYPE_CGM_GRAPH) continue;
         int dur = d->valueint;
         if (dur <= 0 || dur > 3600) continue;
 
