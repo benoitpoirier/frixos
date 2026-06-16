@@ -70,9 +70,15 @@ body {
 }
 
 .screen-layout-select {
+    flex: 1;
     min-width: 220px;
-    max-width: 100%;
-    flex: 1 1 220px;
+    max-width: 300px;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
 }
 
 .screen-section-divider {
@@ -130,28 +136,24 @@ body {
 }
 
 .screen-editor {
-    display: grid;
-    grid-template-columns: 1fr 260px;
-    gap: 16px;
-    align-items: start;
-}
-
-@media (max-width: 900px) {
-    .screen-editor {
-        grid-template-columns: 1fr;
-    }
-}
-
-.screen-left-column {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    width: 100%;
+}
+
+.screen-top-row {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
 }
 
 .screen-canvas-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    flex: 0 0 auto;
 }
 
 .screen-status {
@@ -164,6 +166,7 @@ body {
 }
 
 .screen-canvas {
+    box-sizing: content-box;
     position: relative;
     width: 512px;   /* 128 * 4 */
     height: 512px;  /* 128 * 4 */
@@ -207,38 +210,59 @@ body {
     z-index: 2;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
     .screen-canvas {
-        width: 384px;  /* 128 * 3 */
-        height: 384px;
-        background-size: 12px 12px;
+        width: 256px;  /* 128 * 2 */
+        height: 256px;
+        background-size: 8px 8px;
+    }
+    .screen-palette {
+        flex: 1 1 100%;
     }
 }
 
 .screen-palette {
+    flex: 1 1 200px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--border-color);
     background: var(--section-content-bg);
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
     box-shadow: var(--box-shadow);
+    /* No max-height so it stretches to match canvas exactly via align-items: stretch on parent */
 }
-
+.section .screen-palette h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    flex-shrink: 0;
+}
 .palette-items {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
     margin-top: 10px;
+    overflow-y: auto;
+    align-content: start;
 }
+
+
 
 .palette-item {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border-radius: 8px;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 6px;
     border: 1px solid var(--border-color);
     background: var(--card-bg-color);
     cursor: grab;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: var(--text-color);
 }
 
 .palette-item:active {
@@ -260,9 +284,9 @@ body {
 }
 
 .palette-swatch {
-    width: 56px;
-    height: 56px;
-    border-radius: 6px;
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
     border: 1px solid var(--border-color);
     background: rgba(0,0,0,0.25);
     display: flex;
@@ -270,6 +294,8 @@ body {
     justify-content: center;
     font-weight: 600;
     color: var(--text-secondary);
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .screen-element {

@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Frixos</title>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index.css?v=1781601217">
 </head>
 
 <body>
@@ -156,7 +156,7 @@
 
                 <div class="section">
                     <div class="section-header">
-                        <h2 data-i18n="settings.regional.title">Regional Settings</h2>
+                        <h2 data-i18n="settings.display.title">Display Settings</h2>
                     </div>
                     <div class="section-content">
                         <div class="form-group">
@@ -172,6 +172,14 @@
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
                         </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="settings.regional.title">Regional Settings</h2>
+                    </div>
+                    <div class="section-content">
                         <div class="checkbox-container">
                             <input type="checkbox" id="fahrenheit" name="fahrenheit">
                             <label for="fahrenheit" data-i18n="settings.connection.fahrenheit">US units (F, mph, ...)</label>
@@ -696,18 +704,17 @@
                 </div>
 
                 <div class="screen-editor">
-                    <div class="screen-left-column">
+                    <div id="screenStatus" class="screen-status" aria-live="polite" style="width: 100%; margin-bottom: -10px;"></div>
+                    <div class="screen-top-row">
                         <div class="screen-canvas-wrapper">
                             <div id="screenCanvas" class="screen-canvas" data-i18n-aria-label="screen.editor_aria" role="application" tabindex="0"></div>
-                            <div id="screenStatus" class="screen-status" aria-live="polite"></div>
                         </div>
-                        <div id="screenOptions" class="screen-options"></div>
+                        <div class="screen-palette">
+                            <h3 data-i18n="screen.palette">Palette</h3>
+                            <div id="screenPaletteItems" class="palette-items"></div>
+                        </div>
                     </div>
-
-                    <div class="screen-palette">
-                        <h3 data-i18n="screen.palette">Palette</h3>
-                        <div id="screenPaletteItems" class="palette-items"></div>
-                    </div>
+                    <div id="screenOptions" class="screen-options" style="width: 100%;"></div>
                 </div>
             </div>
         </div>
@@ -844,7 +851,7 @@
         </div>
     </div>
 
-    <script src="index.js"></script>
+    <script src="index.js?v=1781600372"></script>
 </body>
 
 </html>
