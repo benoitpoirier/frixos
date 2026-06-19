@@ -595,6 +595,23 @@ const SCREEN_PALETTE_GRID_DEF = {
     paletteToggle: true
 };
 
+const SCREEN_PALETTE_ORDER = [
+    'screen_settings',
+    'time',
+    'digit_label',
+    'ampm',
+    'message',
+    'time_aux',
+    'digit_label_aux',
+    'weather',
+    'moon',
+    'wifi_off',
+    'glucose_level',
+    'glucose_trend',
+    'screen_grid',
+    'text'
+];
+
 const SCREEN_ALIGNMENT_GRID_LINES = [20, 30, 40, 90, 100, 110];
 
 function getPaletteNewTextIconLabel() {
@@ -638,21 +655,39 @@ function getNextTextSlot(profile) {
 
 function getScreenPaletteDefs() {
     const profile = getProfileObj(window.screenEditor.mode);
-    const base = SCREEN_ELEMENT_DEFS.filter(d => !isScreenStaticTextElement(d.id));
-    const enabledTextItems = [];
+    const items = [];
+
+    SCREEN_PALETTE_ORDER.forEach(id => {
+        if (id === 'screen_settings') {
+            items.push(SCREEN_PALETTE_SETTINGS_DEF);
+            return;
+        }
+        if (id === 'screen_grid') {
+            items.push(SCREEN_PALETTE_GRID_DEF);
+            return;
+        }
+        if (id === 'text') {
+            if (getNextTextSlot(profile) !== null) {
+                items.push(SCREEN_PALETTE_TEXT_DEF);
+            }
+            return;
+        }
+        const def = findElementDef(id);
+        if (def && !isScreenStaticTextElement(def.id)) {
+            items.push(def);
+        }
+    });
+
     if (profile) {
         SCREEN_TEXT_SLOT_IDS.forEach(id => {
             const elem = profile.elements.find(e => e.id === id);
             if (elem && elem.enabled) {
                 const def = findElementDef(id);
-                if (def) enabledTextItems.push({ ...def });
+                if (def) items.push({ ...def });
             }
         });
     }
-    const items = [...base, ...enabledTextItems, SCREEN_PALETTE_SETTINGS_DEF, SCREEN_PALETTE_GRID_DEF];
-    if (getNextTextSlot(profile) !== null) {
-        items.push(SCREEN_PALETTE_TEXT_DEF);
-    }
+
     return items;
 }
 
