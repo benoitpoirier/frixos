@@ -4,17 +4,29 @@
 static const char *TAG = "f-pwm";
 static bool led_pwm_configured = false;
 
-static uint32_t scale_10bit_to_8bit(uint32_t value)
+uint16_t pwm_get_safe_maximum_power(void)
 {
-    if (value > PWM_SETTINGS_MAX_POWER)
-        value = PWM_SETTINGS_MAX_POWER;
-    return (value * PWM_8BIT_MAX_DUTY + (PWM_SETTINGS_MAX_POWER / 2)) / PWM_SETTINGS_MAX_POWER;
+    switch (eeprom_board_rev)
+    {
+    case 1:
+        return 850;
+    case 2:
+        return PWM_SETTINGS_MAX_POWER;
+    default:
+        return 750;
+    }
+}
+
+uint16_t pwm_get_effective_max_power(void)
+{
+    uint32_t safe = pwm_get_safe_maximum_power();
+    return (uint16_t)((safe * eeprom_max_power) / PWM_SETTINGS_MAX_POWER);
 }
 
 static uint32_t normalize_pwm_frequency(uint32_t freq)
 {
-    if (freq < 10)
-        freq = 10;
+    if (freq < PWM_MIN_FREQUENCY_HZ)
+        freq = PWM_MIN_FREQUENCY_HZ;
     if (freq > PWM_MAX_FREQUENCY_HZ)
         freq = PWM_MAX_FREQUENCY_HZ;
     if (freq == 133)
@@ -43,10 +55,10 @@ void startup_led_pwm()
 
     // Configure the LEDC timer
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = mode,                   // Low-speed mode (ESP32 supports both high and low)
-        .timer_num = timer,                   // Use timer 0
-        .duty_resolution = LEDC_TIMER_8_BIT,  // 8-bit resolution
-        .freq_hz = freq,                      // Use frequency from NVS (default 200Hz)
+        .speed_mode = mode,                    // Low-speed mode (ESP32 supports both high and low)
+        .timer_num = timer,                    // Use timer 0
+        .duty_resolution = LEDC_TIMER_10_BIT,  // 10-bit resolution
+        .freq_hz = freq,                       // Use frequency from NVS (default 200Hz)
         // APB at 200 Hz needs div ~400000, above ESP32 LEDC max (0x3FFFF). AUTO_CLK falls back to RC_FAST.
         .clk_cfg = LEDC_AUTO_CLK,
     };
@@ -65,7 +77,7 @@ void startup_led_pwm()
         .timer_sel = timer, // Use timer 0
         .intr_type = LEDC_INTR_DISABLE,
         .gpio_num = 32, // LED GPIO pin is pin32
-        .duty = scale_10bit_to_8bit(eeprom_max_power), // Start with LED at max configured power
+        .duty = pwm_get_effective_max_power(), // Start at scaled max power
         .hpoint = 0};
     err = ledc_channel_config(&ledc_channel);
     if (err != ESP_OK)
@@ -78,7 +90,8 @@ void startup_led_pwm()
 
     // set_led_pwm_brightness(eeprom_brightness_LED[0]); // Set initial brightness
 
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 8bit", (unsigned long)freq);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit safe_max=%u effective_max=%u",
+                (unsigned long)freq, pwm_get_safe_maximum_power(), pwm_get_effective_max_power());
 }
 
 // Reconfigure PWM frequency (called when settings are updated)
@@ -91,10 +104,10 @@ esp_err_t reconfigure_led_pwm_frequency(void)
     
     // Configure the LEDC timer with new frequency
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = mode,                   // Low-speed mode
-        .timer_num = timer,                   // Use timer 0
-        .duty_resolution = LEDC_TIMER_8_BIT,  // 8-bit resolution
-        .freq_hz = freq,                      // New frequency from settings
+        .speed_mode = mode,                    // Low-speed mode
+        .timer_num = timer,                    // Use timer 0
+        .duty_resolution = LEDC_TIMER_10_BIT,  // 10-bit resolution
+        .freq_hz = freq,                       // New frequency from settings
         .clk_cfg = LEDC_AUTO_CLK,
     };
     
@@ -117,9 +130,9 @@ void set_led_pwm_brightness(uint8_t duty)
 {
 
     (duty > 100) ? (duty = 100) : (duty = duty);  // Ensure duty cycle is between 0 and 100
-    uint32_t capped_duty_10bit = ((uint32_t)duty * eeprom_max_power) / 100;
-    int pwm_duty = (int)scale_10bit_to_8bit(capped_duty_10bit);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (actual %i)", duty, pwm_duty);
+    uint16_t effective_max = pwm_get_effective_max_power();
+    int pwm_duty = (int)(((uint32_t)duty * effective_max) / 100);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (duty %i)", duty, pwm_duty);
     if (!led_pwm_configured)
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LED brightness skipped: PWM not configured");

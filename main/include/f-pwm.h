@@ -3,10 +3,12 @@
 
 #include "esp_err.h"
 
-#define MAX_DUTY 750 // a bit less than 75% duty cycle
-#define PWM_MAX_FREQUENCY_HZ 300000
+#define PWM_MIN_FREQUENCY_HZ 60
+#define PWM_MAX_FREQUENCY_HZ 50000
 #define PWM_SETTINGS_MAX_POWER 1023
-#define PWM_8BIT_MAX_DUTY 255
+
+uint16_t pwm_get_safe_maximum_power(void);
+uint16_t pwm_get_effective_max_power(void);
 
 void startup_led_pwm();
 void set_led_pwm_brightness(uint8_t duty);

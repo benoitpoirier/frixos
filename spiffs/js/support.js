@@ -57,7 +57,9 @@ function collectSystemInfo() {
             app: safeGetTextContent('app'),
             version: safeGetTextContent('version'),
             fwversion: safeGetTextContent('fwversion'),
-            revision: safeGetTextContent('revision'),
+            revision: window.statusData && window.statusData.revision
+                ? window.statusData.revision
+                : safeGetTextContent('revision'),
             macAddress: safeGetTextContent('mac_address'),
             ipAddress: safeGetTextContent('ip_address'),
             chipRevision: safeGetTextContent('chip_revision'),
@@ -104,6 +106,21 @@ function collectSystemInfo() {
         dim_end: window.settings ? String(window.settings.p56 ?? 0) : 'Unknown',
         brightness_LED0: window.settings && window.settings.p23 ? window.settings.p23[0] : (el('brightness_LED0') ? el('brightness_LED0').value : ''),
         brightness_LED1: window.settings && window.settings.p23 ? window.settings.p23[1] : (el('brightness_LED1') ? el('brightness_LED1').value : ''),
+        pwm_frequency: window.statusData && window.statusData.pwm_frequency !== undefined
+            ? window.statusData.pwm_frequency
+            : (window.settings ? window.settings.p42 : (el('pwm_frequency') ? el('pwm_frequency').value : '')),
+        max_power: window.statusData && window.statusData.max_power !== undefined
+            ? window.statusData.max_power
+            : (window.settings ? window.settings.p43 : (el('max_power') ? el('max_power').value : '')),
+        board_rev: window.statusData && window.statusData.board_rev !== undefined
+            ? window.statusData.board_rev
+            : 'Unknown',
+        safe_max_power: window.statusData && window.statusData.safe_max_power !== undefined
+            ? window.statusData.safe_max_power
+            : 'Unknown',
+        effective_max_power: window.statusData && window.statusData.effective_max_power !== undefined
+            ? window.statusData.effective_max_power
+            : 'Unknown',
         show_leading_zero: window.settings ? (window.settings.p24 ? 'Yes' : 'No') : 'Unknown',
         eeprom_ha_url: window.settings ? window.settings.p25 : (el('eeprom_ha_url') ? el('eeprom_ha_url').value : ''),
         eeprom_ha_token: window.settings ? (window.settings.p26 ? 'Configured' : 'Not configured') : 'Unknown',
@@ -180,6 +197,11 @@ function formatSystemInfoForEmail(info) {
     emailBody += `Dim Hours: ${info.settings.dim_start}-${info.settings.dim_end}\n`;
     emailBody += `Brightness (Day): ${info.settings.brightness_LED0}%\n`;
     emailBody += `Brightness (Night): ${info.settings.brightness_LED1}%\n`;
+    emailBody += `PWM Frequency: ${info.settings.pwm_frequency || 'Unknown'} Hz\n`;
+    emailBody += `Max Power: ${info.settings.max_power || 'Unknown'}\n`;
+    emailBody += `Board Revision: ${info.settings.board_rev}\n`;
+    emailBody += `Safe Max Power: ${info.settings.safe_max_power}\n`;
+    emailBody += `Effective Max Power: ${info.settings.effective_max_power}\n`;
     emailBody += `Message: ${info.settings.message}\n\n`;
     
     // Integration Settings

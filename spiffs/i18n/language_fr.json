@@ -79,6 +79,7 @@
     "text_width": "Largeur (px, 0 = sans limite)",
     "text_align": "Alignement",
     "time_font": "Police de l'heure",
+    "theme_font": "Thème/Police",
     "color_filter": "Filtre de couleur",
     "font_selection": "Sélection de police",
     "font_samples": "Sélection de police",
@@ -135,7 +136,9 @@
       "text_5": "Texte 5",
       "text_6": "Texte 6",
       "text_7": "Texte 7",
-      "text_8": "Texte 8"
+      "text_8": "Texte 8",
+      "screen_grid": "Grille d'écran",
+      "screen_settings": "Paramètres d'écran"
     }
   },
   "advanced": {

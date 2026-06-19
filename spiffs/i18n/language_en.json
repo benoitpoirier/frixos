@@ -90,6 +90,7 @@
     "text_width": "Width (px, 0 = no limit)",
     "text_align": "Alignment",
     "time_font": "Time font",
+    "theme_font": "Theme/Font",
     "color_filter": "Color filter",
     "font_selection": "Font Selection",
     "font_samples": "Font Selection",
@@ -147,7 +148,8 @@
       "text_6": "Text 6",
       "text_7": "Text 7",
       "text_8": "Text 8",
-      "screen_grid": "Screen Grid"
+      "screen_grid": "Screen Grid",
+      "screen_settings": "Screen settings"
     }
   },
   "advanced": {

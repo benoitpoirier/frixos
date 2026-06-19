@@ -79,6 +79,7 @@
     "text_width": "Bredd (px, 0 = ingen gräns)",
     "text_align": "Justering",
     "time_font": "Tidstypsnitt",
+    "theme_font": "Tema/Typsnitt",
     "color_filter": "Färgfilter",
     "font_selection": "Typsnittsval",
     "font_samples": "Typsnittsval",
@@ -135,7 +136,9 @@
       "text_5": "Text 5",
       "text_6": "Text 6",
       "text_7": "Text 7",
-      "text_8": "Text 8"
+      "text_8": "Text 8",
+      "screen_grid": "Skärmsrutnät",
+      "screen_settings": "Skärminställningar"
     }
   },
   "advanced": {

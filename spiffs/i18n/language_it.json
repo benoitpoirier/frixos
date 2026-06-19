@@ -79,6 +79,7 @@
     "text_width": "Larghezza (px, 0 = nessun limite)",
     "text_align": "Allineamento",
     "time_font": "Font dell'ora",
+    "theme_font": "Tema/Font",
     "color_filter": "Filtro colore",
     "font_selection": "Selezione font",
     "font_samples": "Selezione font",
@@ -135,7 +136,9 @@
       "text_5": "Testo 5",
       "text_6": "Testo 6",
       "text_7": "Testo 7",
-      "text_8": "Testo 8"
+      "text_8": "Testo 8",
+      "screen_grid": "Griglia schermo",
+      "screen_settings": "Impostazioni schermo"
     }
   },
   "advanced": {

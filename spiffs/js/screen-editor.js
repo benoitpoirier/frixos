@@ -383,6 +383,11 @@ function updateScreenStatusLine() {
         return;
     }
 
+    if (selectedId === 'screen_settings') {
+        status.textContent = `Selected: ${getScreenElementLabel('screen_settings')}`;
+        return;
+    }
+
     if (selectedId && profile) {
         const elem = profile.elements.find(item => item.id === selectedId);
         const def = findElementDef(selectedId);
@@ -569,6 +574,16 @@ const SCREEN_PALETTE_TEXT_DEF = {
     dynamicHeight: true
 };
 
+const SCREEN_PALETTE_SETTINGS_DEF = {
+    id: 'screen_settings',
+    label: 'Screen settings',
+    w: 32,
+    h: 32,
+    img: 'bold.jpg',
+    paletteFitFullImage: true,
+    paletteMeta: true
+};
+
 const SCREEN_PALETTE_GRID_DEF = {
     id: 'screen_grid',
     label: 'Screen Grid',
@@ -576,6 +591,7 @@ const SCREEN_PALETTE_GRID_DEF = {
     h: 32,
     img: 'default-grid.jpg',
     paletteFitFullImage: true,
+    paletteMeta: true,
     paletteToggle: true
 };
 
@@ -633,7 +649,7 @@ function getScreenPaletteDefs() {
             }
         });
     }
-    const items = [...base, ...enabledTextItems, SCREEN_PALETTE_GRID_DEF];
+    const items = [...base, ...enabledTextItems, SCREEN_PALETTE_SETTINGS_DEF, SCREEN_PALETTE_GRID_DEF];
     if (getNextTextSlot(profile) !== null) {
         items.push(SCREEN_PALETTE_TEXT_DEF);
     }
@@ -642,6 +658,14 @@ function getScreenPaletteDefs() {
 
 function isScreenGridElement(id) {
     return id === 'screen_grid';
+}
+
+function isScreenSettingsElement(id) {
+    return id === 'screen_settings';
+}
+
+function isScreenMetaElement(id) {
+    return isScreenGridElement(id) || isScreenSettingsElement(id);
 }
 
 function getScreenGridEnabled() {
@@ -989,6 +1013,7 @@ function getProfileObj(mode) {
 
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
+    if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
     if (id === 'screen_grid') return SCREEN_PALETTE_GRID_DEF;
     return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
 }
@@ -1162,7 +1187,7 @@ function shouldIgnoreScreenKeyboardNudge() {
 
 function nudgeSelectedScreenElement(key, shiftKey) {
     const selectedId = window.screenEditor.selectedId;
-    if (!selectedId || isScreenGridElement(selectedId)) return false;
+    if (!selectedId || isScreenMetaElement(selectedId)) return false;
 
     const nudge = shiftKey ? 10 : 1;
     const profile = getProfileObj(window.screenEditor.mode);
@@ -1472,6 +1497,9 @@ function renderScreenPalette() {
             (def.id === 'screen_grid' && getScreenGridEnabled())) {
             item.classList.add('palette-item-selected');
         }
+        if (def.paletteMeta) {
+            item.classList.add('palette-item-meta');
+        }
         if (def.paletteToggle) {
             item.classList.add('palette-item-toggle');
         }
@@ -1489,8 +1517,8 @@ function renderScreenPalette() {
 
         if (!unavailable) {
             const selectPaletteItem = () => {
-                if (def.paletteToggle) {
-                    if (def.id === 'screen_grid') {
+                if (def.paletteMeta) {
+                    if (def.paletteToggle && def.id === 'screen_grid') {
                         setScreenGridEnabled(!getScreenGridEnabled());
                     }
                     window.screenEditor.selectedId = def.id;
@@ -1499,7 +1527,7 @@ function renderScreenPalette() {
                     renderScreenPalette();
                     updateScreenStatusLine();
                     focusScreenCanvas();
-                    saveScreenTimeDisplaySettings();
+                    if (def.paletteToggle) saveScreenTimeDisplaySettings();
                     return;
                 }
                 const activeProfile = getProfileObj(window.screenEditor.mode);
@@ -1515,7 +1543,7 @@ function renderScreenPalette() {
                 focusScreenCanvas();
             };
 
-            if (def.paletteToggle) {
+            if (def.paletteMeta) {
                 item.addEventListener('pointerdown', (e) => {
                     e.preventDefault();
                     selectPaletteItem();
@@ -1531,7 +1559,7 @@ function renderScreenPalette() {
             item.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (def.paletteToggle) {
+                    if (def.paletteMeta) {
                         selectPaletteItem();
                         return;
                     }
@@ -1898,6 +1926,63 @@ function renderScreenCanvas() {
     updateScreenStatusLine();
 }
 
+async function appendScreenThemeFilterOptions(container, trans) {
+    const mode = window.screenEditor.mode;
+    const fontKey = mode === 'night' ? 'night_font' : 'day_font';
+    const filterKey = mode === 'night' ? 'night_color_filter' : 'day_color_filter';
+    ensureScreenLayoutMeta(window.screenLayout);
+
+    const modeNote = document.createElement('p');
+    modeNote.className = 'screen-options-mode-note';
+    modeNote.textContent = mode === 'night'
+        ? (getNestedTranslation(trans, 'screen.night_profile') || 'Night profile')
+        : (getNestedTranslation(trans, 'screen.day_profile') || 'Day profile');
+    container.appendChild(modeNote);
+
+    const timeFontRow = document.createElement('div');
+    timeFontRow.className = 'form-group';
+    const timeFontLabel = document.createElement('label');
+    timeFontLabel.textContent = getNestedTranslation(trans, 'screen.theme_font') || 'Theme/Font';
+    const timeFontSelect = document.createElement('select');
+    SCREEN_TIME_FONTS.forEach(font => {
+        const option = document.createElement('option');
+        option.value = font;
+        option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
+        timeFontSelect.appendChild(option);
+    });
+    timeFontSelect.value = window.screenLayout[fontKey] || 'bold';
+    timeFontSelect.addEventListener('change', () => {
+        window.screenLayout[fontKey] = timeFontSelect.value;
+        renderScreenCanvas();
+        renderScreenOptions();
+    });
+    timeFontRow.appendChild(timeFontLabel);
+    timeFontRow.appendChild(timeFontSelect);
+    container.appendChild(timeFontRow);
+
+    const filterRow = document.createElement('div');
+    filterRow.className = 'form-group';
+    const filterLabel = document.createElement('label');
+    filterLabel.textContent = getNestedTranslation(trans, 'screen.color_filter') || 'Color filter';
+    const filterSelect = document.createElement('select');
+    SCREEN_COLOR_FILTER_OPTIONS.forEach(o => {
+        const option = document.createElement('option');
+        option.value = String(o.v);
+        option.textContent = getNestedTranslation(trans, o.key) || o.label;
+        filterSelect.appendChild(option);
+    });
+    filterSelect.value = String(window.screenLayout[filterKey] || 0);
+    filterSelect.addEventListener('change', () => {
+        window.screenLayout[filterKey] = parseInt(filterSelect.value, 10) || 0;
+        renderScreenCanvas();
+    });
+    filterRow.appendChild(filterLabel);
+    filterRow.appendChild(filterSelect);
+    container.appendChild(filterRow);
+
+    await appendScreenFontSamples(container, window.screenLayout[fontKey] || 'bold', fontKey);
+}
+
 async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
     await ensureScreenSpiffsFiles();
     const wrap = document.createElement('div');
@@ -1991,6 +2076,14 @@ function renderScreenOptions() {
         return;
     }
 
+    if (isScreenSettingsElement(window.screenEditor.selectedId)) {
+        const title = document.createElement('h3');
+        title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel('screen_settings')}`;
+        opt.appendChild(title);
+        appendScreenThemeFilterOptions(opt, trans);
+        return;
+    }
+
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const e = ensureElementInProfile(profile, window.screenEditor.selectedId);
@@ -2029,60 +2122,6 @@ function renderScreenOptions() {
     opt.appendChild(enabledRow);
 
     if (e.id === 'time') {
-        const mode = window.screenEditor.mode;
-        const fontKey = mode === 'night' ? 'night_font' : 'day_font';
-        const filterKey = mode === 'night' ? 'night_color_filter' : 'day_color_filter';
-        ensureScreenLayoutMeta(window.screenLayout);
-
-        const modeNote = document.createElement('p');
-        modeNote.className = 'screen-options-mode-note';
-        modeNote.textContent = mode === 'night'
-            ? (getNestedTranslation(trans, 'screen.night_profile') || 'Night profile')
-            : (getNestedTranslation(trans, 'screen.day_profile') || 'Day profile');
-        opt.appendChild(modeNote);
-
-        const timeFontRow = document.createElement('div');
-        timeFontRow.className = 'form-group';
-        const timeFontLabel = document.createElement('label');
-        timeFontLabel.textContent = getNestedTranslation(trans, 'screen.time_font') || 'Time font';
-        const timeFontSelect = document.createElement('select');
-        SCREEN_TIME_FONTS.forEach(font => {
-            const option = document.createElement('option');
-            option.value = font;
-            option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
-            timeFontSelect.appendChild(option);
-        });
-        timeFontSelect.value = window.screenLayout[fontKey] || 'bold';
-        timeFontSelect.addEventListener('change', () => {
-            window.screenLayout[fontKey] = timeFontSelect.value;
-            renderScreenCanvas();
-            renderScreenOptions();
-        });
-        timeFontRow.appendChild(timeFontLabel);
-        timeFontRow.appendChild(timeFontSelect);
-        opt.appendChild(timeFontRow);
-
-        const filterRow = document.createElement('div');
-        filterRow.className = 'form-group';
-        const filterLabel = document.createElement('label');
-        filterLabel.textContent = getNestedTranslation(trans, 'screen.color_filter') || 'Color filter';
-        const filterSelect = document.createElement('select');
-        SCREEN_COLOR_FILTER_OPTIONS.forEach(o => {
-            const option = document.createElement('option');
-            option.value = String(o.v);
-            option.textContent = getNestedTranslation(trans, o.key) || o.label;
-            filterSelect.appendChild(option);
-        });
-        filterSelect.value = String(window.screenLayout[filterKey] || 0);
-        filterSelect.addEventListener('change', () => {
-            window.screenLayout[filterKey] = parseInt(filterSelect.value, 10) || 0;
-        });
-        filterRow.appendChild(filterLabel);
-        filterRow.appendChild(filterSelect);
-        opt.appendChild(filterRow);
-
-        appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold', fontKey);
-
         const leadingRow = document.createElement('div');
         leadingRow.className = 'checkbox-container';
         const leadingInput = document.createElement('input');

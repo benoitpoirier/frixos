@@ -266,12 +266,10 @@ uint8_t eeprom_dexcom_region = 0;     // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 uint16_t eeprom_glucose_high = 175;   // Default high threshold in mg/dL
 uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
-uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-300000)
-uint16_t eeprom_max_power = MAX_DUTY; // Default max power (range 1-1023)
-// Board revision read-only key in NVS:
-// versions A, B, C, D, E, F and G are revision 0; version H is revision 1.
-// in rev 1 board, PWM has an analog filter and can go beyond the 5k frequency limit.
-// to make the LED inaudible
+uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 60-50000)
+uint16_t eeprom_max_power = PWM_SETTINGS_MAX_POWER; // Default max power (range 1-1023)
+// Board revision read-only key in NVS (drives safe_maximum_power in f-pwm.c):
+// rev 0: safe max 750; rev 1: safe max 850; rev 2: safe max 1023
 uint8_t eeprom_board_rev = 0;
 
 // LibreLinkUp settings
@@ -711,18 +709,10 @@ void startup_read_eeprom(void)
         write_nvs_parameters();
     }
 
-    if (eeprom_board_rev == 1)
-    {
-      // 33333 is a dud; revert to 200 (used to be the other way around)
-      if (eeprom_pwm_frequency == 33333)
-        eeprom_pwm_frequency = 200;
-
-      if (eeprom_max_power == 750)
-        eeprom_max_power = 850;
-
-      if (eeprom_max_power == 900)
-        eeprom_max_power = 850;
-    }
+    if (eeprom_pwm_frequency < PWM_MIN_FREQUENCY_HZ)
+      eeprom_pwm_frequency = PWM_MIN_FREQUENCY_HZ;
+    if (eeprom_pwm_frequency > PWM_MAX_FREQUENCY_HZ)
+      eeprom_pwm_frequency = PWM_MAX_FREQUENCY_HZ;
 
     // Initialize current POH counter and last save time
     current_poh = eeprom_poh;

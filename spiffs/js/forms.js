@@ -42,7 +42,7 @@
  * - p56 = dim_end (Time-of-day dimming end hour)
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-300000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 60-50000)
  * - p43 = max_power (Max power, range 1-1023)
  * - p46 = wifi_start (WiFi Active Hours Start, 0-23)
  * - p47 = wifi_end (WiFi Active Hours End, 0-23)

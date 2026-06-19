@@ -117,6 +117,7 @@ function fetchStatus(includeLogs = false) {
                 el('ha_status_textarea').value = 'No Integrations active';
             }
 
+            window.statusData = data;
             return data; // Return the data for other functions to use
         })
         .catch(error => {

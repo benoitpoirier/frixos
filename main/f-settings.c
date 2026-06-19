@@ -82,7 +82,7 @@
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-300000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 60-50000)
  * - p43 = max_power (Max power, range 1-1023)
  *
  * Integration Settings (shortened):
@@ -1264,7 +1264,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
 
     /* p42 pwm_frequency */
     if ((item = cJSON_GetObjectItem(root, "p42")) && cJSON_IsNumber(item))
-        CHECK_RANGE("pwm_frequency", item->valueint, 10, PWM_MAX_FREQUENCY_HZ);
+        CHECK_RANGE("pwm_frequency", item->valueint, PWM_MIN_FREQUENCY_HZ, PWM_MAX_FREQUENCY_HZ);
 
     /* p43 max_power */
     if ((item = cJSON_GetObjectItem(root, "p43")) && cJSON_IsNumber(item))
@@ -1961,8 +1961,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(pwm_frequency))
     {
         int freq_value = (int)pwm_frequency->valueint;
-        // Validate range 10-300000
-        if (freq_value >= 10 && freq_value <= PWM_MAX_FREQUENCY_HZ)
+        // Validate range 60-50000
+        if (freq_value >= PWM_MIN_FREQUENCY_HZ && freq_value <= PWM_MAX_FREQUENCY_HZ)
         {
             eeprom_pwm_frequency = (uint32_t)freq_value;
             pwm_frequency_changed = true;
@@ -1970,7 +1970,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (10-%u): %d, keeping current value", PWM_MAX_FREQUENCY_HZ, freq_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (%u-%u): %d, keeping current value",
+                        PWM_MIN_FREQUENCY_HZ, PWM_MAX_FREQUENCY_HZ, freq_value);
         }
     }
 
@@ -1983,7 +1984,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         if (power_value >= 1 && power_value <= 1023)
         {
             eeprom_max_power = (uint16_t)power_value;
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Max power set to: %u", eeprom_max_power);
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Max power set to: %u (effective max: %u, safe max: %u)",
+                        eeprom_max_power, pwm_get_effective_max_power(), pwm_get_safe_maximum_power());
         }
         else
         {
@@ -2477,6 +2479,13 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "app", app);
     cJSON_AddStringToObject(root, "version", version);
     cJSON_AddNumberToObject(root, "fwversion", fwversion);
+
+    cJSON_AddStringToObject(root, "revision", revision);
+    cJSON_AddNumberToObject(root, "board_rev", eeprom_board_rev);
+    cJSON_AddNumberToObject(root, "pwm_frequency", eeprom_pwm_frequency);
+    cJSON_AddNumberToObject(root, "max_power", eeprom_max_power);
+    cJSON_AddNumberToObject(root, "safe_max_power", pwm_get_safe_maximum_power());
+    cJSON_AddNumberToObject(root, "effective_max_power", pwm_get_effective_max_power());
 
     // Add additional system information
     esp_chip_info_t chip_info;

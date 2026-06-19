@@ -219,7 +219,8 @@
     box-shadow: 0 0 0 1px var(--primary-color);
 }
 
-.palette-item-toggle {
+.palette-item-toggle,
+.palette-item-meta {
     cursor: pointer;
 }
 

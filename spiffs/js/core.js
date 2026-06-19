@@ -771,11 +771,11 @@ function setupFieldValidations() {
             return null; // Valid
         },
         
-        // PWM Frequency: 10-300000 integer
+        // PWM Frequency: 60-50000 integer
         pwmFrequencyValidator: function(value) {
             const num = parseInt(value);
             if (isNaN(num)) return "Must be a whole number";
-            if (num < 10 || num > 300000) return "Must be between 10 and 300000";
+            if (num < 60 || num > 50000) return "Must be between 60 and 50000";
             return null; // Valid
         },
         

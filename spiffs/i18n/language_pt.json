@@ -79,6 +79,7 @@
     "text_width": "Largura (px, 0 = sem limite)",
     "text_align": "Alinhamento",
     "time_font": "Tipo de letra da hora",
+    "theme_font": "Tema/Fonte",
     "color_filter": "Filtro de cor",
     "font_selection": "Seleção de tipo de letra",
     "font_samples": "Seleção de tipo de letra",
@@ -135,7 +136,9 @@
       "text_5": "Texto 5",
       "text_6": "Texto 6",
       "text_7": "Texto 7",
-      "text_8": "Texto 8"
+      "text_8": "Texto 8",
+      "screen_grid": "Grelha do ecrã",
+      "screen_settings": "Definições do ecrã"
     }
   },
   "advanced": {
