@@ -1,6 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\v6.0.1\\esp-idf",
+  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
   "idf.openOcdConfigs": [
     "board/esp32-wrover-kit-3.3v.cfg"
   ],
@@ -30,8 +30,8 @@
     "f-dexcom.h": "c",
     "lv_image_decoder.h": "c"
   },
-  "idf.pythonInstallPath": "c:\\Espressif\\tools\\python\\v6.0.1\\venv\\Scripts\\python.exe",
-  "idf.currentSetup": "C:\\Espressif\\frameworks\\v6.0.1\\esp-idf",
+  "idf.pythonInstallPath": "c:\\Espressif\\python_env\\idf6.0_py3.13_env\\Scripts\\python.exe",
+  "idf.currentSetup": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
   "idf.buildPath": "${workspaceFolder}/build",
   "idf.customExtraVars": {}
 }
