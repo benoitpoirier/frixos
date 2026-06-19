@@ -31,6 +31,7 @@
 #include "esp_flash.h"
 #include "esp_system.h"
 #include "esp_clk_tree.h"
+#include "esp_timer.h"
 #include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -2792,11 +2793,136 @@ cleanup:
 
 #define FILE_PATH "/spiffs/uploaded.bin"
 #define MAX_FILE_SIZE (2500 * 1024) // 2500 KB max file size
+#define ESP_FIRMWARE_MAGIC 0xE9
+
+static bool upload_payload_is_firmware(const uint8_t *data, size_t len)
+{
+    return len > 0 && data[0] == ESP_FIRMWARE_MAGIC;
+}
+
+static void upload_ensure_filename(char *filename, size_t filename_size, bool filename_found, bool is_firmware)
+{
+    if (filename_found && filename[0] != '\0')
+    {
+        return;
+    }
+
+    if (is_firmware)
+    {
+        snprintf(filename, filename_size, "firmware.bin");
+    }
+    else
+    {
+        snprintf(filename, filename_size, "upload_%lu.dat", (unsigned long)(esp_timer_get_time() / 1000));
+    }
+}
+
+typedef struct
+{
+    httpd_req_t *req;
+    char *filename;
+    size_t filename_size;
+    bool filename_found;
+    bool *is_firmware;
+    bool *upload_destination_open;
+    FILE **file;
+    esp_ota_handle_t *ota_handle;
+    const esp_partition_t **update_partition;
+    char *filepath;
+    size_t filepath_size;
+    int *total_received;
+    int content_len;
+} upload_ctx_t;
+
+static esp_err_t upload_open_destination(upload_ctx_t *ctx, const uint8_t *first_payload, size_t first_payload_len)
+{
+    if (*ctx->upload_destination_open)
+    {
+        return ESP_OK;
+    }
+
+    *ctx->is_firmware = upload_payload_is_firmware(first_payload, first_payload_len);
+    upload_ensure_filename(ctx->filename, ctx->filename_size, ctx->filename_found, *ctx->is_firmware);
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Processing %s file: %s, size: %d bytes",
+                *ctx->is_firmware ? "firmware" : "regular", ctx->filename, ctx->content_len);
+
+    if (*ctx->is_firmware)
+    {
+        *ctx->update_partition = esp_ota_get_next_update_partition(NULL);
+        if (!*ctx->update_partition)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to find OTA partition");
+            httpd_resp_send_err(ctx->req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition found");
+            return ESP_FAIL;
+        }
+
+        esp_err_t err = esp_ota_begin(*ctx->update_partition, OTA_SIZE_UNKNOWN, ctx->ota_handle);
+        if (err != ESP_OK)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA begin failed: %s", esp_err_to_name(err));
+            httpd_resp_send_err(ctx->req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start OTA process");
+            return ESP_FAIL;
+        }
+
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA update started for partition: %s", (*ctx->update_partition)->label);
+    }
+    else
+    {
+        snprintf(ctx->filepath, ctx->filepath_size, "/spiffs/%s", ctx->filename);
+        *ctx->file = fopen(ctx->filepath, "wb");
+        if (!*ctx->file)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open file for writing: %s", ctx->filepath);
+            httpd_resp_send_err(ctx->req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create file");
+            return ESP_FAIL;
+        }
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "File opened for writing: %s", ctx->filepath);
+    }
+
+    *ctx->upload_destination_open = true;
+    return ESP_OK;
+}
+
+static esp_err_t upload_write_payload(upload_ctx_t *ctx, const void *data, size_t len)
+{
+    if (len == 0)
+    {
+        return ESP_OK;
+    }
+
+    if (*ctx->is_firmware)
+    {
+        esp_err_t err = esp_ota_write(*ctx->ota_handle, data, len);
+        if (err != ESP_OK)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA write error: %s", esp_err_to_name(err));
+            esp_ota_abort(*ctx->ota_handle);
+            httpd_resp_send_err(ctx->req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA write error");
+            return ESP_FAIL;
+        }
+    }
+    else
+    {
+        size_t written = fwrite(data, 1, len, *ctx->file);
+        if (written != len)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, len);
+            fclose(*ctx->file);
+            *ctx->file = NULL;
+            httpd_resp_send_err(ctx->req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
+            return ESP_FAIL;
+        }
+    }
+
+    *ctx->total_received += len;
+    return ESP_OK;
+}
 
 esp_err_t ota_post_handler(httpd_req_t *req)
 {
     char buf[1024];
-    char filename[128] = "firmware.bin"; // Default filename
+    char filename[128] = {0};
     int recv_len = 0, total_received = 0, remaining = req->content_len;
     bool is_multipart = false, filename_found = false;
     char end_marker[136] = {0}; // "\r\n--{boundary}" used to trim trailing boundary from file chunks
@@ -2885,8 +3011,8 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         }
     }
 
-    // Read first chunk to extract filename if multipart and not found yet
-    if (is_multipart && !filename_found)
+    // Read first multipart chunk to extract filename and skip form headers
+    if (is_multipart && recv_len == 0)
     {
         recv_len = httpd_req_recv(req, buf, sizeof(buf) - 1);
         if (recv_len > 0)
@@ -2912,7 +3038,7 @@ esp_err_t ota_post_handler(httpd_req_t *req)
                     if (end)
                     {
                         int name_len = end - fname;
-                        if (name_len > 0 && name_len < sizeof(filename) - 1)
+                        if (!filename_found && name_len > 0 && name_len < sizeof(filename) - 1)
                         {
                             memset(filename, 0, sizeof(filename));
                             strncpy(filename, fname, name_len);
@@ -2934,51 +3060,30 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         }
     }
 
-    // Determine if this is a firmware update or a regular file
-    bool is_firmware = (strstr(filename, ".bin") != NULL);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Processing %s file: %s, size: %d bytes",
-                is_firmware ? "firmware" : "regular", filename, req->content_len);
+    bool is_firmware = false;
+    bool upload_destination_open = false;
 
     // Prepare file or OTA handle
     FILE *file = NULL;
-    esp_ota_handle_t ota_handle;
+    esp_ota_handle_t ota_handle = 0;
     const esp_partition_t *update_partition = NULL;
     char filepath[256] = {0};
 
-    if (is_firmware)
-    {
-        // Initialize OTA update
-        update_partition = esp_ota_get_next_update_partition(NULL);
-        if (!update_partition)
-        {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to find OTA partition");
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition found");
-            return ESP_FAIL;
-        }
-
-        err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
-        if (err != ESP_OK)
-        {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA begin failed: %s", esp_err_to_name(err));
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start OTA process");
-            return ESP_FAIL;
-        }
-
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA update started for partition: %s", update_partition->label);
-    }
-    else
-    {
-        // Open file for writing
-        snprintf(filepath, sizeof(filepath), "/spiffs/%s", filename);
-        file = fopen(filepath, "wb");
-        if (!file)
-        {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open file for writing: %s", filepath);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create file");
-            return ESP_FAIL;
-        }
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "File opened for writing: %s", filepath);
-    }
+    upload_ctx_t upload_ctx = {
+        .req = req,
+        .filename = filename,
+        .filename_size = sizeof(filename),
+        .filename_found = filename_found,
+        .is_firmware = &is_firmware,
+        .upload_destination_open = &upload_destination_open,
+        .file = &file,
+        .ota_handle = &ota_handle,
+        .update_partition = &update_partition,
+        .filepath = filepath,
+        .filepath_size = sizeof(filepath),
+        .total_received = &total_received,
+        .content_len = req->content_len,
+    };
 
     // Process the first chunk if we already read it (multipart form data)
     if (is_multipart && recv_len > 0)
@@ -2993,31 +3098,16 @@ esp_err_t ota_post_handler(httpd_req_t *req)
             {
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Processing first chunk body: %d bytes", body_len);
 
-                if (is_firmware)
+                if (upload_open_destination(&upload_ctx, (const uint8_t *)body_start, body_len) != ESP_OK)
                 {
-                    err = esp_ota_write(ota_handle, body_start, body_len);
-                    if (err != ESP_OK)
-                    {
-                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA write error on first chunk: %s", esp_err_to_name(err));
-                        esp_ota_abort(ota_handle);
-                        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA write error");
-                        return ESP_FAIL;
-                    }
-                }
-                else
-                {
-                    size_t written = fwrite(body_start, 1, body_len, file);
-                    if (written != body_len)
-                    {
-                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error on first chunk: %d of %d bytes written",
-                                    written, body_len);
-                        fclose(file);
-                        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
-                        return ESP_FAIL;
-                    }
+                    return ESP_FAIL;
                 }
 
-                total_received += body_len;
+                if (upload_write_payload(&upload_ctx, body_start, body_len) != ESP_OK)
+                {
+                    return ESP_FAIL;
+                }
+
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "First chunk processed: %d bytes, total: %d", body_len, total_received);
             }
         }
@@ -3047,13 +3137,16 @@ esp_err_t ota_post_handler(httpd_req_t *req)
                 {
                     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Too many timeouts, aborting upload");
 
-                    if (is_firmware)
+                    if (upload_destination_open)
                     {
-                        esp_ota_abort(ota_handle);
-                    }
-                    else
-                    {
-                        fclose(file);
+                        if (is_firmware)
+                        {
+                            esp_ota_abort(ota_handle);
+                        }
+                        else if (file)
+                        {
+                            fclose(file);
+                        }
                     }
 
                     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload timeout");
@@ -3069,13 +3162,16 @@ esp_err_t ota_post_handler(httpd_req_t *req)
                 // Other errors
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Socket error: %d", recv_len);
 
-                if (is_firmware)
+                if (upload_destination_open)
                 {
-                    esp_ota_abort(ota_handle);
-                }
-                else
-                {
-                    fclose(file);
+                    if (is_firmware)
+                    {
+                        esp_ota_abort(ota_handle);
+                    }
+                    else if (file)
+                    {
+                        fclose(file);
+                    }
                 }
 
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Socket error");
@@ -3104,37 +3200,23 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         }
 
         // Process received data
-        if (is_firmware)
+        if (!upload_destination_open)
         {
-            err = esp_ota_write(ota_handle, buf, write_len);
-            if (err != ESP_OK)
+            if (upload_open_destination(&upload_ctx, (const uint8_t *)buf, write_len) != ESP_OK)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA write error: %s", esp_err_to_name(err));
-                esp_ota_abort(ota_handle);
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA write error");
                 return ESP_FAIL;
             }
         }
-        else
+
+        if (upload_write_payload(&upload_ctx, buf, write_len) != ESP_OK)
         {
-            if (write_len > 0)
-            {
-                size_t written = fwrite(buf, 1, write_len, file);
-                if ((int)written != write_len)
-                {
-                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, write_len);
-                    fclose(file);
-                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
-                    return ESP_FAIL;
-                }
-            }
+            return ESP_FAIL;
         }
 
         if (boundary_found)
             break;
 
         // Update progress counters
-        total_received += recv_len;
         remaining -= recv_len;
         retry_count = 0; // Reset retry counter after successful read
 
@@ -3148,6 +3230,13 @@ esp_err_t ota_post_handler(httpd_req_t *req)
     }
 
     // Finalize the upload
+    if (!upload_destination_open)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Upload contained no file data");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Upload contained no file data");
+        return ESP_FAIL;
+    }
+
     if (is_firmware)
     {
         err = esp_ota_end(ota_handle);

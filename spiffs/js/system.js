@@ -571,6 +571,7 @@ function setupUpdateSection() {
         
         // Open and send the request
         xhr.open('POST', '/api/ota', true);
+        xhr.setRequestHeader('X-Filename', file.name);
         xhr.send(formData);
     });
     
