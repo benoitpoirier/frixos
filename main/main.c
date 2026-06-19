@@ -124,7 +124,7 @@ uint8_t eeprom_update_firmware = 1; // yes, auto update firmware
 uint8_t eeprom_dark_theme = 1;      // Default to dark theme (1 = dark, 0 = light)
 uint8_t eeprom_language = 0;        // Default to English (0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl)
 uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
-uint8_t eeprom_scroll_delay = 65;   // Default scroll delay in milliseconds (30-500)
+uint8_t eeprom_scroll_delay = 60;   // Default scroll delay in milliseconds (30-500)
 char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
 
 screen_layout_t eeprom_screen_layout = {0};
@@ -713,6 +713,29 @@ void startup_read_eeprom(void)
       eeprom_pwm_frequency = PWM_MIN_FREQUENCY_HZ;
     if (eeprom_pwm_frequency > PWM_MAX_FREQUENCY_HZ)
       eeprom_pwm_frequency = PWM_MAX_FREQUENCY_HZ;
+
+    // Migrate the old default scroll delay (65 ms) to the new default (60 ms).
+    // 65 ms beats against the ~33 Hz panel refresh and stutters; 60 ms is a clean
+    // multiple and scrolls smoothly. Fix both the global and the per-layout copy
+    // (screen_scroll_delay_ms() prefers the layout value) and persist if changed.
+    {
+      bool scroll_migrated = false;
+      if (eeprom_scroll_delay == 65)
+      {
+        eeprom_scroll_delay = 60;
+        scroll_migrated = true;
+      }
+      if (eeprom_screen_layout.scroll_delay == 65)
+      {
+        eeprom_screen_layout.scroll_delay = 60;
+        scroll_migrated = true;
+      }
+      if (scroll_migrated)
+      {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay 65ms -> 60ms");
+        write_nvs_parameters();
+      }
+    }
 
     // Initialize current POH counter and last save time
     current_poh = eeprom_poh;

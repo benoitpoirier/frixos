@@ -147,6 +147,14 @@ static lv_obj_t *label_degree_aux = NULL;
 
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
+
+// Time-based scroll belt state (suggestion #1: position from elapsed wall-clock
+// time; suggestion #2: sampled every fast loop pass, redraw only on pixel change).
+#define SCROLL_LOOP_MS 20          // fixed, fast display-loop period, decoupled from scroll speed
+static int64_t scroll_t0_us = 0;   // time origin of the current message
+static int scroll_seed_px = 0;     // belt offset (px) at scroll_t0_us
+static int scroll_last_ipos = 0;   // last integer offset applied to the labels
+static bool scroll_last_valid = false; // false => force a reposition on the next pass
 lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
 lv_obj_t *dots[2] = {NULL, NULL};
 lv_obj_t *aux_digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
@@ -742,11 +750,16 @@ void set_scroll_message(const char *msg)
     label_max_pos = label_size;
     if (content_changed)
     {
-      // New text or font: restart belt from the right edge.
-      label_scroll_pos = MSG_WIDTH;
-      label_scroll_swap = false;
-      lv_obj_set_pos(label_msg,      msg_x + MSG_WIDTH, msg_y);
-      lv_obj_set_pos(label_msg_loop, msg_x + MSG_WIDTH + label_max_pos + 20, msg_y);
+      // New text or font: reset the time origin and enter from the right edge.
+      const int scroll_period = label_max_pos + 20;
+      scroll_seed_px = MSG_WIDTH;
+      scroll_t0_us = esp_timer_get_time();
+      int ipos = scroll_seed_px % scroll_period;
+      if (ipos > 0) ipos -= scroll_period; // normalize into (-period, 0]
+      scroll_last_ipos = ipos;
+      scroll_last_valid = true;
+      lv_obj_set_pos(label_msg,      msg_x + ipos,                msg_y);
+      lv_obj_set_pos(label_msg_loop, msg_x + ipos + scroll_period, msg_y);
     }
     // else: same content, same font — belt keeps scrolling uninterrupted.
     lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
@@ -1829,6 +1842,8 @@ static bool is_time_of_day_bright(void)
 
 static void handle_als_and_brightness(uint32_t loop_counter)
 {
+  (void)loop_counter; // cadence is now time-based, independent of loop rate
+  static int64_t als_last_read_us = 0;
   uint8_t old_font_index = font_index;
 
   if (manufacturer_mode || eeprom_dim_mode == DIM_MODE_FULL)
@@ -1839,9 +1854,10 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   {
     font_index = is_time_of_day_bright() ? 0 : 1;
   }
-  else if (loop_counter % 100 == 1)
+  else if ((esp_timer_get_time() - als_last_read_us) >= 5000000)
   {
-    // read ALS sensor every 5 seconds. each pass is 50ms, so 100 passes = 5 seconds
+    // read ALS sensor every 5 seconds (time-based, independent of loop period)
+    als_last_read_us = esp_timer_get_time();
     lux = ltr303_get_frixos_lux();
 
     if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
@@ -2034,7 +2050,11 @@ static void advance_schedule_runner(schedule_runner_t *runner, time_t now, bool 
 
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display)
 {
-  if (loop_counter % 20 != 1) return;
+  (void)loop_counter; // cadence is now time-based, independent of loop rate
+  static int64_t alt_last_us = 0;
+  int64_t alt_now_us = esp_timer_get_time();
+  if ((alt_now_us - alt_last_us) < 1000000) return; // ~1s cadence
+  alt_last_us = alt_now_us;
 
   static bool last_primary_glucose = false;
   static bool last_primary_weather = false;
@@ -2317,30 +2337,35 @@ void display_task(void *pvParameters)
     }
 
     if (label_size > MSG_CENTER_WIDTH)
-    { // scrolling — belt algorithm:
-      // label_scroll_pos tracks the x-offset of the leftmost label.
-      // Both labels are always scroll_period apart.
-      // When the leftmost label fully exits left it teleports (invisibly)
-      // to become the new rightmost, and the roles swap.
-      const int scroll_period = label_max_pos + 20;
-      label_scroll_pos--;
-      // Right edge of leftmost label: label_scroll_pos + label_max_pos
-      // When it goes below 0 the label has fully exited the screen.
-      if (label_scroll_pos + label_max_pos < 0)
-      {
-        label_scroll_pos += scroll_period; // teleport: now rightmost
-        label_scroll_swap = !label_scroll_swap; // swap physical label roles
-      }
+    { // scrolling — time-based seamless belt.
+      // Both labels carry the same text and sit scroll_period apart, so the
+      // leftmost copy can move continuously left and the wrap is invisible
+      // (no role swap needed).
+      int scroll_period = label_max_pos + 20;
+      if (scroll_period < 1) scroll_period = 1;
+      uint32_t delay_ms = screen_scroll_delay_ms(); // milliseconds per pixel
+      if (delay_ms < 1) delay_ms = 1;
 
+      // #1 time-based: the offset is a pure function of elapsed wall-clock time,
+      //    so loop-timing jitter and tick quantization never reach the motion.
+      // #2 high-rate sampling: this runs every SCROLL_LOOP_MS pass (well above the
+      //    panel refresh), so a 1px step lands the instant elapsed time crosses
+      //    delay_ms. We only touch LVGL when the integer pixel actually changes.
+      int64_t traveled = (esp_timer_get_time() - scroll_t0_us) / ((int64_t)delay_ms * 1000);
+      int64_t pos = (int64_t)scroll_seed_px - traveled;
+      int ipos = (int)(pos % scroll_period);
+      if (ipos > 0) ipos -= scroll_period; // normalize into (-period, 0]
+
+      if (!scroll_last_valid || ipos != scroll_last_ipos)
       {
+        scroll_last_ipos = ipos;
+        scroll_last_valid = true;
         const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
         const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
         const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
-        lv_obj_t *left_label  = label_scroll_swap ? label_msg_loop : label_msg;
-        lv_obj_t *right_label = label_scroll_swap ? label_msg       : label_msg_loop;
         lvgl_port_lock(0);
-        lv_obj_set_pos(left_label,  msg_x + label_scroll_pos,                msg_y);
-        lv_obj_set_pos(right_label, msg_x + label_scroll_pos + scroll_period, msg_y);
+        lv_obj_set_pos(label_msg,      msg_x + ipos,                msg_y);
+        lv_obj_set_pos(label_msg_loop, msg_x + ipos + scroll_period, msg_y);
         lvgl_port_unlock();
       }
     }
@@ -2355,8 +2380,10 @@ void display_task(void *pvParameters)
     // which were executing every ~65ms in the high-frequency display loop.
     display_task_heartbeat++;
 
-    // vTaskDelay(pdMS_TO_TICKS(eeprom_scroll_delay));
-    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(screen_scroll_delay_ms()));
+    // Fixed, fast loop period (decoupled from scroll speed). Scroll speed is now
+    // expressed purely as time in the belt math above, so the loop runs at a
+    // steady high rate and only the per-pixel duration changes with the setting.
+    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(SCROLL_LOOP_MS));
   } // end of while (1) loop
 
   ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exit (unexpected)");
