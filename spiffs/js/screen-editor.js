@@ -530,9 +530,19 @@ function getPreviewImageUrl(def, inMatrix) {
         const font = inMatrix ? getScreenAuxFont(window.screenEditor.mode) : 'bold';
         return resolveTimeFontPreviewUrl(font);
     }
+    
+    // For specific UI assets, always use the image path from def.img to match palette
+    const useFixedAsset = [
+        'weather', 'moon', 'ampm', 'glucose_level', 'glucose_trend', 'wifi_off', 'cgm_graph'
+    ].includes(def.id);
+
+    if (useFixedAsset) {
+        return def.img;
+    }
+
     const item = SCREEN_THEME_ASSETS[def.id];
     if (item && inMatrix) {
-        return resolveThemeAssetUrl(getScreenTimeFont(window.screenEditor.mode), item);
+        return resolveTimeFontPreviewUrl(getScreenTimeFont(window.screenEditor.mode)).replace('bold.jpg', `${getScreenTimeFont(window.screenEditor.mode)}-${item}.bmp`); // Simplified fallback
     }
     return def.img;
 }
@@ -540,17 +550,17 @@ function getPreviewImageUrl(def, inMatrix) {
 const SCREEN_ELEMENT_DEFS = [
     { id: 'time',            label: 'Digit Display',       w: 80,  h: 36, img: 'bold.jpg', paletteFitFullImage: true },
     { id: 'time_aux',        label: 'Digit Display (Aux)', w: 80,  h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'ampm',            label: 'AM/PM',               w: 10,  h: 20, img: 'default-ampm.jpg' },
     { id: 'digit_label',     label: 'Digit Label',         w: 80,  h:  8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label },
     { id: 'digit_label_aux', label: 'Digit Label (Aux)',   w: 80,  h:  8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux },
     { id: 'message',         label: 'Scrolling Message',   w: 128, h:  8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
-    { id: 'weather',         label: 'Weather',             w: 32,  h: 22, img: 'default-weather.jpg' },
-    { id: 'moon',            label: 'Moon',                w: 14,  h: 14, img: 'default-moon.jpg' },
+    { id: 'ampm',            label: 'AM/PM',               w: 10,  h: 20, img: 'images/ampm.png' },
+    { id: 'weather',         label: 'Weather',             w: 32,  h: 22, img: 'images/weather.png' },
+    { id: 'moon',            label: 'Moon',                w: 14,  h: 14, img: 'images/moon.png' },
+    { id: 'cgm_graph',       label: 'Glucose Graph',       w: 90,  h: 34, img: 'images/graph.png' },
+    { id: 'glucose_level',   label: 'Glucose Level',       w: 14,  h: 20, img: 'images/glucose.png' },
+    { id: 'glucose_trend',   label: 'Glucose Trend',       w: 12,  h: 14, img: 'images/glucoseupdown.png' },
+    { id: 'wifi_off',        label: 'WiFi off',            w: 20,  h: 20, img: 'images/nowifi.png' },
     /* text_1..text_8 inserted here at runtime by getScreenPaletteDefs */
-    { id: 'cgm_graph',       label: 'Glucose Graph',       w: 90,  h: 34, img: 'default-trend.jpg' },
-    { id: 'glucose_level',   label: 'Glucose Level',       w: 14,  h: 20, img: 'default-glucose.jpg' },
-    { id: 'glucose_trend',   label: 'Glucose Trend',       w: 12,  h: 14, img: 'default-trend.jpg' },
-    { id: 'wifi_off',        label: 'WiFi off',            w: 20,  h: 20, img: 'default-wifi-off.jpg' },
     { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
     { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
     { id: 'text_3', label: 'Text 3', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
@@ -898,7 +908,8 @@ function screenWireProfileToJson(view, offset, widget_size) {
             /* height: encoded as (40-h) in bits[5:1] of font byte */
             const h_enc      = (w.font >> 1) & 0x1F;
             const graph_height = Math.max(28, Math.min(40, 40 - h_enc));
-            const show_markers = !!(w.font & 0x01);
+            const show_x_markers = !!(w.font & 0x01);
+            const show_y_markers = !!(w.font & 0x20);
             const graph_width  = w.width || 100;
             /* time scale: stored as (min/10) in align byte, 0 = default 180 */
             const time_scale   = w.align ? w.align * 10 : 180;
@@ -915,11 +926,11 @@ function screenWireProfileToJson(view, offset, widget_size) {
             const band_color   = (w.band_r || w.band_g || w.band_b)
                                  ? screenRgbToHex(w.band_r, w.band_g, w.band_b) : '#003300';
             elem.options = {
-                show_markers, graph_width, graph_height, time_scale,
+                show_x_markers, show_y_markers, graph_width, graph_height, time_scale,
                 color: ok_color, bg_color: danger_color, warn_color,
                 label_color, axis_color, band_color,
                 /* packed encoded fields */
-                font:  (show_markers ? 1 : 0) | ((40 - graph_height) << 1),
+                font:  (show_x_markers ? 0x01 : 0) | ((40 - graph_height) << 1) | (show_y_markers ? 0x20 : 0),
                 width: graph_width,
                 align: Math.round(time_scale / 10)
             };
@@ -1169,7 +1180,8 @@ function ensureScreenCgmGraphOptions(element) {
     if (element.options.graph_width  == null) element.options.graph_width  = 90;
     if (element.options.graph_height == null) element.options.graph_height = 34;
     if (element.options.time_scale   == null) element.options.time_scale   = 180;
-    if (element.options.show_markers == null) element.options.show_markers = false;
+    if (element.options.show_x_markers == null) element.options.show_x_markers = false;
+    if (element.options.show_y_markers == null) element.options.show_y_markers = false;
     if (!element.options.color)       element.options.color       = '#00cc00';
     if (!element.options.bg_color)    element.options.bg_color    = '#ff0000';
     if (!element.options.warn_color)  element.options.warn_color  = '#ff8800';
@@ -1180,7 +1192,7 @@ function ensureScreenCgmGraphOptions(element) {
     const gw = Math.min(120, Math.max(60, element.options.graph_width));
     const gh = Math.min(40,  Math.max(28, element.options.graph_height));
     const ts = Math.min(480, Math.max(60, element.options.time_scale));
-    element.options.font  = (element.options.show_markers ? 1 : 0) | ((40 - gh) << 1);
+    element.options.font  = (element.options.show_x_markers ? 0x01 : 0) | ((40 - gh) << 1) | (element.options.show_y_markers ? 0x20 : 0);
     element.options.width = gw;
     element.options.align = Math.round(ts / 10);
 }
@@ -1429,8 +1441,8 @@ function setupSpriteBackground(preview, imgUrl, nativeH, displayW, displayH) {
     sheet.onload = () => {
         preview.style.backgroundImage = `url(${imgUrl})`;
         preview.style.backgroundRepeat = 'no-repeat';
-        preview.style.backgroundPosition = 'left top';
-        preview.style.backgroundSize = `${sheet.naturalWidth * scale}px ${displayH}px`;
+        preview.style.backgroundPosition = 'center center';
+        preview.style.backgroundSize = 'contain';
     };
     sheet.src = imgUrl;
 }
@@ -1489,7 +1501,13 @@ function createScreenPreview(def, inMatrix, elementState, matrixScale) {
             const pxW = size.w * matrixScale;
             const pxH = size.h * matrixScale;
             preview.setAttribute('aria-label', def.label);
-            if (def.paletteFitFullImage) {
+
+            // Special handling for predefined assets to avoid distortion
+            const useFixedAsset = [
+                'weather', 'moon', 'ampm', 'glucose_level', 'glucose_trend', 'wifi_off'
+            ].includes(def.id);
+
+            if (useFixedAsset || def.paletteFitFullImage) {
                 preview.classList.add('screen-preview-contained');
                 setupContainedBackground(preview, previewImg);
             } else {
@@ -2485,24 +2503,43 @@ function renderScreenOptions() {
         tsRow.appendChild(tsInput);
         opt.appendChild(tsRow);
 
-        /* Show markers */
-        const markRow = document.createElement('div');
-        markRow.className = 'checkbox-container';
-        const markInput = document.createElement('input');
-        markInput.type = 'checkbox';
-        markInput.id = 'cgm_show_markers';
-        markInput.checked = !!e.options.show_markers;
-        const markLabel = document.createElement('label');
-        markLabel.htmlFor = 'cgm_show_markers';
-        markLabel.textContent = 'Show axis markers';
-        markInput.addEventListener('change', () => {
-            e.options.show_markers = markInput.checked;
+        /* Show X markers (abscisses — time axis) */
+        const markXRow = document.createElement('div');
+        markXRow.className = 'checkbox-container';
+        const markXInput = document.createElement('input');
+        markXInput.type = 'checkbox';
+        markXInput.id = 'cgm_show_x_markers';
+        markXInput.checked = !!e.options.show_x_markers;
+        const markXLabel = document.createElement('label');
+        markXLabel.htmlFor = 'cgm_show_x_markers';
+        markXLabel.textContent = 'Show X-axis markers (time)';
+        markXInput.addEventListener('change', () => {
+            e.options.show_x_markers = markXInput.checked;
             ensureScreenCgmGraphOptions(e);
             renderScreenCanvas();
         });
-        markRow.appendChild(markInput);
-        markRow.appendChild(markLabel);
-        opt.appendChild(markRow);
+        markXRow.appendChild(markXInput);
+        markXRow.appendChild(markXLabel);
+        opt.appendChild(markXRow);
+
+        /* Show Y markers (ordonnées — glucose axis) */
+        const markYRow = document.createElement('div');
+        markYRow.className = 'checkbox-container';
+        const markYInput = document.createElement('input');
+        markYInput.type = 'checkbox';
+        markYInput.id = 'cgm_show_y_markers';
+        markYInput.checked = !!e.options.show_y_markers;
+        const markYLabel = document.createElement('label');
+        markYLabel.htmlFor = 'cgm_show_y_markers';
+        markYLabel.textContent = 'Show Y-axis markers (glucose)';
+        markYInput.addEventListener('change', () => {
+            e.options.show_y_markers = markYInput.checked;
+            ensureScreenCgmGraphOptions(e);
+            renderScreenCanvas();
+        });
+        markYRow.appendChild(markYInput);
+        markYRow.appendChild(markYLabel);
+        opt.appendChild(markYRow);
 
         /* In-range color */
         const okRow = document.createElement('div');
