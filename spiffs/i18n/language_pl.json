@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Ustawienia",
     "advanced": "Zaawansowane",
-    "screen": "Układ",
+    "screen": "Wyświetlacz",
     "integrations": "Integracje",
     "status": "Status",
     "update": "Aktualizacja",
@@ -147,7 +147,7 @@
       "show_scroll": "Pokaż przewijaną wiadomość informacyjną",
       "show_weather": "Pokaż ikonę prognozy pogody i fazę księżyca",
       "show_sprite": "Pokaż animowany duszek zamiast pogody",
-      "sprite_weather": "Animated weather type",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto / current weather",
       "sprite_weather_clearsky": "1 Clear sky / 01d, 01n / clearsky",
       "sprite_weather_fair": "2 Fair / few clouds / 02d, 02n / fair",

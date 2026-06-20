@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Impostazioni",
     "advanced": "Avanzate",
-    "screen": "Layout",
+    "screen": "Visualizzazione",
     "integrations": "Integrazioni",
     "status": "Stato",
     "update": "Aggiorna",
@@ -49,7 +49,7 @@
     }
   },
   "screen": {
-    "title": "Layout",
+    "title": "Disposizione",
     "description": "Posiziona gli elementi sul display 128×128. Gli elementi possono sovrapporsi.",
     "day": "Giorno",
     "night": "Notte",
@@ -147,7 +147,7 @@
       "show_scroll": "Mostra messaggio informativo scorrevole",
       "show_weather": "Mostra icona previsioni meteo e fase lunare",
       "show_sprite": "Mostra sprite animato al posto del meteo",
-      "sprite_weather": "Animated weather type",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto / current weather",
       "sprite_weather_clearsky": "1 Clear sky / 01d, 01n / clearsky",
       "sprite_weather_fair": "2 Fair / few clouds / 02d, 02n / fair",

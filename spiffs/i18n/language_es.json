@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Configuración",
     "advanced": "Avanzado",
-    "screen": "Diseño",
+    "screen": "Pantalla",
     "integrations": "Integraciones",
     "status": "Estado",
     "update": "Actualizar",
@@ -53,7 +53,7 @@
     }
   },
   "screen": {
-    "title": "Diseño",
+    "title": "Disposición",
     "description": "Coloque elementos en la pantalla de 128×128. Los elementos pueden superponerse.",
     "day": "Día",
     "night": "Noche",
@@ -151,7 +151,7 @@
       "show_scroll": "Mostrar mensaje de información desplazable",
       "show_weather": "Mostrar icono de pronóstico del tiempo y fase lunar",
       "show_sprite": "Mostrar sprite animado en lugar del tiempo",
-      "sprite_weather": "Tipo de clima animado",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto",
       "sprite_weather_clearsky": "Cielo despejado",
       "sprite_weather_fair": "Pocas nubes",

@@ -7,12 +7,6 @@ function updateDimmingModeSections() {
     if (timeSection) timeSection.style.display = mode === 2 ? '' : 'none';
 }
 
-function updateSpriteWeatherSection() {
-    const spriteAnim = el('sprite_anim');
-    const spriteWeatherGroup = el('sprite_weather_group');
-    if (spriteWeatherGroup) spriteWeatherGroup.style.display = spriteAnim && spriteAnim.checked ? '' : 'none';
-}
-
 // --- Location helpers (geolocation + city search) ---
 
 function locationMsg(text, cls) {
@@ -263,7 +257,6 @@ function setupAdvancedSection() {
         if (el('brightness_LED1') && window.settings.p23 && window.settings.p23[1] !== undefined) el('brightness_LED1').value = window.settings.p23[1];
         if (el('pwm_frequency') && window.settings.p42 !== undefined) el('pwm_frequency').value = window.settings.p42 || 200;
         if (el('max_power') && window.settings.p43 !== undefined) el('max_power').value = window.settings.p43 || 1023;
-        updateSpriteWeatherSection();
     }
 }
 
@@ -458,7 +451,6 @@ function serializeDisplaySchedule(listId = 'display-schedule-list') {
 }
 
 function setupIntegrationsSection() {
-    const form = el('integrationsForm');
     const haUrlInput = el('eeprom_ha_url');
     const haTokenInput = el('eeprom_ha_token');
     const haTokenMask = el('eeprom_ha_token-mask');
@@ -612,18 +604,18 @@ function setupIntegrationsSection() {
         }
     }
 
-    if (form) {
-        const submitBtnIntegrations = form.querySelector('button[type="submit"]');
-        if (submitBtnIntegrations) {
-            submitBtnIntegrations.disabled = !window.settingsLoaded.integrations;
-        }
+    const submitBtnIntegrations = el('integrationsSubmitBtn');
+    if (submitBtnIntegrations) {
+        submitBtnIntegrations.disabled = !window.settingsLoaded.integrations;
     }
 }
 
 // Function to handle Home Assistant Integration settings
 function setupIntegrationsValidation() {
-    const integrationsForm = el('integrationsForm');
-    if (!integrationsForm) return;
+    const haForm = el('haForm');
+    const stockForm = el('stockForm');
+    const glucoseForm = el('glucoseForm');
+    if (!haForm && !stockForm && !glucoseForm) return;
 
     // Home Assistant validation
     const haUrl = el('eeprom_ha_url');
@@ -673,14 +665,14 @@ function setupIntegrationsValidation() {
     }
 
     function validateGlucoseMonitors() {
-        const dexcomRegionVal = el('eeprom_dexcom_region').value;
-        const libreRegionVal = el('eeprom_libre_region').value;
+        const dexcomRegionVal = (el('eeprom_dexcom_region') && el('eeprom_dexcom_region').value) || '0';
+        const libreRegionVal = (el('eeprom_libre_region') && el('eeprom_libre_region').value) || '0';
         const nsUrlVal = (el('eeprom_ns_url') && el('eeprom_ns_url').value) ? el('eeprom_ns_url').value.trim() : '';
-        const username = el('eeprom_glucose_username').value;
-        const password = el('eeprom_glucose_password').value;
-        const refresh = el('eeprom_glucose_refresh').value;
-        const glucoseHigh = el('eeprom_glucose_high').value;
-        const glucoseLow = el('eeprom_glucose_low').value;
+        const username = el('eeprom_glucose_username') ? el('eeprom_glucose_username').value : '';
+        const password = el('eeprom_glucose_password') ? el('eeprom_glucose_password').value : '';
+        const refresh = el('eeprom_glucose_refresh') ? el('eeprom_glucose_refresh').value : '';
+        const glucoseHigh = el('eeprom_glucose_high') ? el('eeprom_glucose_high').value : '';
+        const glucoseLow = el('eeprom_glucose_low') ? el('eeprom_glucose_low').value : '';
 
         const dexcomEnabled = dexcomRegionVal !== '0';
         const libreEnabled = libreRegionVal !== '0';
@@ -727,8 +719,8 @@ function setupIntegrationsValidation() {
     }
 
     function validateHomeAssistant() {
-        const url = haUrl.value.trim();
-        const token = haToken.value.trim();
+        const url = haUrl ? haUrl.value.trim() : '';
+        const token = haToken ? haToken.value.trim() : '';
         const refresh = haRefresh ? parseInt(haRefresh.value) : 1;
 
         // If URL is provided, validate format
@@ -762,42 +754,85 @@ function setupIntegrationsValidation() {
         return true;
     }
 
-    integrationsForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    const integrationsSubmitBtn = el('integrationsSubmitBtn');
 
-        // Trigger field-level validation before checking
-        if (haUrl) haUrl.dispatchEvent(new Event('input', { bubbles: true }));
-        if (haToken) haToken.dispatchEvent(new Event('input', { bubbles: true }));
-        if (stockKey) stockKey.dispatchEvent(new Event('input', { bubbles: true }));
+    if (integrationsSubmitBtn) {
+        integrationsSubmitBtn.addEventListener('click', function() {
+            // Trigger validation events
+            if (haUrl) haUrl.dispatchEvent(new Event('input', { bubbles: true }));
+            if (haToken) haToken.dispatchEvent(new Event('input', { bubbles: true }));
+            if (stockKey) stockKey.dispatchEvent(new Event('input', { bubbles: true }));
 
-        // Check for existing field-level validation errors
-        const urlError = el('eeprom_ha_url-error');
-        const tokenError = el('eeprom_ha_token-error');
-        const stockKeyError = el('eeprom_stock_key-error');
+            // Check for errors across all form sections
+            let hasError = false;
+            ['haForm', 'stockForm', 'glucoseForm'].forEach(id => {
+                const f = el(id);
+                if (f) f.querySelectorAll('.input-error').forEach(err => {
+                    if (err.textContent && err.style.display !== 'none') hasError = true;
+                });
+            });
 
-        if ((urlError && urlError.textContent) || (tokenError && tokenError.textContent) || (stockKeyError && stockKeyError.textContent)) {
-            showStatus(getMessage('correct_form_before_save'), 'error');
-            return;
-        }
+            if (hasError) {
+                showStatus(getMessage('correct_form_before_save'), 'error');
+                return;
+            }
 
-        let isValid = true;
+            if (!validateHomeAssistant()) return;
+            if (!validateStock()) return;
+            if (!validateGlucoseMonitors()) return;
 
-        // Validate Home Assistant if enabled
-        if (haUrl.value.trim() || haToken.value.trim()) {
-            isValid = validateHomeAssistant() && isValid;
-        }
+            saveIntegrationsData(this);
+        });
+    }
+}
 
-        // Validate Stock if enabled
-        if (stockKey.value.trim()) {
-            isValid = validateStock() && isValid;
-        }
+function saveIntegrationsData(btnEl) {
+    const formData = {};
 
-        // Validate CGM (only one of Dexcom, FreeStyle Libre, or Nightscout URL can be enabled)
-        isValid = validateGlucoseMonitors() && isValid;
+    function g(id) { return document.getElementById(id); }
 
-        if (isValid) {
-            handleFormSubmit(e, 'integrationsForm');
-        }
-    });
+    // Home Assistant (p25, p26, p27)
+    const haUrlEl = g('eeprom_ha_url');
+    if (haUrlEl) { const v = haUrlEl.value.trim(); if (hasValueChanged(v, window.settings.p25) || (!window.settings.p25 && v)) formData.p25 = v; }
+    const haTokenEl = g('eeprom_ha_token');
+    if (haTokenEl) { const v = haTokenEl.value.trim(); if (hasValueChanged(v, window.settings.p26) || (!window.settings.p26 && v)) formData.p26 = v; }
+    const haRefreshEl = g('eeprom_ha_refresh_mins');
+    if (haRefreshEl) addIfChanged(formData, 'p27', parseInt(haRefreshEl.value) || 1, window.settings.p27);
+
+    // Stock (p28, p29)
+    const stockKeyEl = g('eeprom_stock_key');
+    if (stockKeyEl) { const v = stockKeyEl.value.trim(); if (hasValueChanged(v, window.settings.p28) || (!window.settings.p28 && v)) formData.p28 = v; }
+    const stockRefreshEl = g('eeprom_stock_refresh_mins');
+    if (stockRefreshEl) addIfChanged(formData, 'p29', parseInt(stockRefreshEl.value) || 5, window.settings.p29);
+
+    // Glucose thresholds / shared settings (p33, p45, p51, p52, p53)
+    const glucoseHighEl = g('eeprom_glucose_high');
+    if (glucoseHighEl) addIfChanged(formData, 'p51', parseInt(glucoseHighEl.value) || 175, window.settings.p51);
+    const glucoseLowEl = g('eeprom_glucose_low');
+    if (glucoseLowEl) addIfChanged(formData, 'p52', parseInt(glucoseLowEl.value) || 70, window.settings.p52);
+    const glucoseRefreshEl = g('eeprom_glucose_refresh');
+    if (glucoseRefreshEl) addIfChanged(formData, 'p33', parseInt(glucoseRefreshEl.value) || 5, window.settings.p33);
+    const glucoseUnitEl = g('eeprom_glucose_unit');
+    if (glucoseUnitEl) addIfChanged(formData, 'p53', parseInt(glucoseUnitEl.value) || 0, window.settings.p53);
+    const glucoseValidityEl = g('glucose_validity_duration');
+    if (glucoseValidityEl) addIfChanged(formData, 'p45', parseInt(glucoseValidityEl.value) || 30, window.settings.p45);
+
+    // Glucose credentials (p31, p32)
+    const glucoseUserEl = g('eeprom_glucose_username');
+    if (glucoseUserEl) { const v = glucoseUserEl.value.trim(); if (hasValueChanged(v, window.settings.p31) || ((window.settings.p31 === undefined || window.settings.p31 === null) && v)) formData.p31 = v; }
+    const glucosePassEl = g('eeprom_glucose_password');
+    if (glucosePassEl) { const v = glucosePassEl.value.trim(); if (hasValueChanged(v, window.settings.p32) || (!window.settings.p32 && v)) formData.p32 = v; }
+
+    // CGM selection (p30, p44, p54)
+    const dexcomEl = g('eeprom_dexcom_region');
+    if (dexcomEl) addIfChanged(formData, 'p30', parseInt(dexcomEl.value) || 0, window.settings.p30);
+    const libreEl = g('eeprom_libre_region');
+    if (libreEl) addIfChanged(formData, 'p44', parseInt(libreEl.value) || 0, window.settings.p44);
+    const nsUrlEl = g('eeprom_ns_url');
+    if (nsUrlEl) addIfChanged(formData, 'p54', nsUrlEl.value.trim(), window.settings.p54 || '');
+
+    showStatus(getMessage('saving_settings'), 'info');
+    toggleLoading(btnEl, true);
+    saveSettings(formData, false).finally(() => toggleLoading(btnEl, false));
 }
 

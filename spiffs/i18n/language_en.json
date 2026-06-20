@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Settings",
     "advanced": "Advanced",
-    "screen": "Layout",
+    "screen": "Display",
     "integrations": "Integrations",
     "status": "Status",
     "files": "Files",
@@ -159,7 +159,7 @@
       "show_scroll": "Show scrolling information message",
       "show_weather": "Show weather forecast icon and moon phase",
       "show_sprite": "Show animated sprite instead of weather",
-      "sprite_weather": "Animated weather type",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto",
       "sprite_weather_clearsky": "Clear sky",
       "sprite_weather_fair": "Few clouds",

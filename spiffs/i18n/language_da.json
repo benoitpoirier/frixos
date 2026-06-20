@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Indstillinger",
     "advanced": "Avanceret",
-    "screen": "Layout",
+    "screen": "Visning",
     "integrations": "Integrationer",
     "status": "Status",
     "update": "Opdater",
@@ -147,7 +147,7 @@
       "show_scroll": "Vis rullende informationsbesked",
       "show_weather": "Vis vejrudsigtsikon og månefase",
       "show_sprite": "Vis animeret sprite i stedet for vejr",
-      "sprite_weather": "Animeret vejrtype",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto",
       "sprite_weather_clearsky": "Klart vejr",
       "sprite_weather_fair": "Letskyet",

@@ -167,23 +167,8 @@ function handleFormSubmit(e, formId) {
         const rotationEl = getFieldInForm('rotation');
         if (rotationEl && addIfChanged(formData, 'p03', parseInt(rotationEl.value) || 0, window.settings.p03)) changedCount++;
 
-        const showGridEl = getFieldInForm('show_grid');
-        if (showGridEl && addIfChanged(formData, 'p08', showGridEl.checked ? 1 : 0, window.settings.p08)) changedCount++;
-
         const mirroringEl = getFieldInForm('mirroring');
         if (mirroringEl && addIfChanged(formData, 'p09', mirroringEl.checked ? 1 : 0, window.settings.p09)) changedCount++;
-
-        const spriteAnimEl = getFieldInForm('sprite_anim');
-        if (spriteAnimEl && addIfChanged(formData, 'p64', spriteAnimEl.checked ? 1 : 0, window.settings.p64)) changedCount++;
-
-        const spriteWeatherEl = getFieldInForm('sprite_weather');
-        if (spriteWeatherEl && addIfChanged(formData, 'p65', parseInt(spriteWeatherEl.value) || 0, window.settings.p65)) changedCount++;
-
-        const spriteWaitEl = getFieldInForm('sprite_wait_s');
-        if (spriteWaitEl && addIfChanged(formData, 'p66', parseInt(spriteWaitEl.value) || 0, window.settings.p66)) changedCount++;
-
-        const spriteCycleEl = getFieldInForm('sprite_cycle_s');
-        if (spriteCycleEl && addIfChanged(formData, 'p67', parseInt(spriteCycleEl.value) || 0, window.settings.p67)) changedCount++;
     }
 
     // Advanced form fields (advancedForm)
@@ -224,27 +209,6 @@ function handleFormSubmit(e, formId) {
         const dimEndEl = getFieldInForm('dim_end');
         if (dimEndEl && addIfChanged(formData, 'p56', parseTimeStringToMins(dimEndEl.value), window.settings.p56)) changedCount++;
 
-        const rotationEl = getFieldInForm('rotation');
-        if (rotationEl && addIfChanged(formData, 'p03', parseInt(rotationEl.value) || 0, window.settings.p03)) changedCount++;
-        
-        const showGridEl = getFieldInForm('show_grid');
-        if (showGridEl && addIfChanged(formData, 'p08', showGridEl.checked ? 1 : 0, window.settings.p08)) changedCount++;
-        
-        const mirroringEl = getFieldInForm('mirroring');
-        if (mirroringEl && addIfChanged(formData, 'p09', mirroringEl.checked ? 1 : 0, window.settings.p09)) changedCount++;
-        
-        const spriteAnimEl = getFieldInForm('sprite_anim');
-        if (spriteAnimEl && addIfChanged(formData, 'p64', spriteAnimEl.checked ? 1 : 0, window.settings.p64)) changedCount++;
-
-        const spriteWeatherEl = getFieldInForm('sprite_weather');
-        if (spriteWeatherEl && addIfChanged(formData, 'p65', parseInt(spriteWeatherEl.value) || 0, window.settings.p65)) changedCount++;
-
-        const spriteWaitEl = getFieldInForm('sprite_wait_s');
-        if (spriteWaitEl && addIfChanged(formData, 'p66', parseInt(spriteWaitEl.value) || 0, window.settings.p66)) changedCount++;
-
-        const spriteCycleEl = getFieldInForm('sprite_cycle_s');
-        if (spriteCycleEl && addIfChanged(formData, 'p67', parseInt(spriteCycleEl.value) || 0, window.settings.p67)) changedCount++;       
-
         // Handle brightness array - check if any element changed
         // Backend expects exactly 2 elements [day, night], range 1-100. Do not send a third element.
         const brightnessLED0El = getFieldInForm('brightness_LED0');
@@ -267,8 +231,8 @@ function handleFormSubmit(e, formId) {
         if (maxPowerEl && addIfChanged(formData, 'p43', parseInt(maxPowerEl.value) || 0, window.settings.p43)) changedCount++;
     }
 
-    // Integrations form fields (integrationsForm)
-    if (formId === 'integrationsForm') {
+    // Integrations form fields
+    if (formId === 'haForm' || formId === 'stockForm' || formId === 'glucoseForm' || formId === 'integrationsForm') {
         const haUrlInput = getFieldInForm('eeprom_ha_url');
         if (haUrlInput) {
             const newUrl = haUrlInput.value.trim();
@@ -488,12 +452,6 @@ function setupSettingsSection() {
             settingsForm.addEventListener('submit', (e) => handleFormSubmit(e, 'settingsForm'));
         }
 
-        // Add listener for sprite animation checkbox (moved from advanced)
-        const spriteAnimCheckbox = el('sprite_anim');
-        if (spriteAnimCheckbox) {
-            spriteAnimCheckbox.addEventListener('change', updateSpriteWeatherSection);
-        }
-
         // Static IP toggle: show / hide the panel when the checkbox changes
         // When toggled ON and fields are empty, pre-fill with current DHCP values
         const useStaticIpEl = el('use_static_ip');
@@ -538,29 +496,16 @@ function setupSettingsSection() {
         const hour12El = el('hour12');
         const updateFirmwareEl = el('update_firmware');
         const rotationEl = el('rotation');
-        const showGridEl = el('show_grid');
         const mirroringEl = el('mirroring');
-        const spriteAnimEl = el('sprite_anim');
-        const spriteWeatherEl = el('sprite_weather');
-        const spriteWaitEl = el('sprite_wait_s');
-        const spriteCycleEl = el('sprite_cycle_s');
         
         if (hostnameEl && window.settings.p00 !== undefined) hostnameEl.value = window.settings.p00;
         if (wifiSsidEl && window.settings.p34 !== undefined) wifiSsidEl.value = window.settings.p34;
         if (wifiPassEl && window.settings.p35 !== undefined) wifiPassEl.value = window.settings.p35;
         if (rotationEl && window.settings.p03 !== undefined) rotationEl.value = window.settings.p03 || 0;
-        if (showGridEl && window.settings.p08 !== undefined) showGridEl.checked = window.settings.p08;
         if (mirroringEl && window.settings.p09 !== undefined) mirroringEl.checked = window.settings.p09;
-        if (spriteAnimEl && window.settings.p64 !== undefined) spriteAnimEl.checked = !!window.settings.p64;
-        if (spriteWeatherEl && window.settings.p65 !== undefined) spriteWeatherEl.value = String(window.settings.p65 || 0);
-        if (spriteWaitEl && window.settings.p66 !== undefined) spriteWaitEl.value = window.settings.p66 || 0;
-        if (spriteCycleEl && window.settings.p67 !== undefined) spriteCycleEl.value = window.settings.p67 || 0;
         if (fahrenheitEl && window.settings.p36 !== undefined) fahrenheitEl.checked = window.settings.p36;
         if (hour12El && window.settings.p37 !== undefined) hour12El.checked = window.settings.p37;
         if (updateFirmwareEl && window.settings.p39 !== undefined) updateFirmwareEl.checked = window.settings.p39;
-
-        // Update visibility of the sub-group
-        updateSpriteWeatherSection();
 
         // Populate static IP fields
         const hasStaticIp = window.settings.p60 !== undefined && window.settings.p60 !== '';

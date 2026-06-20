@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Einstellungen",
     "advanced": "Erweitert",
-    "screen": "Layout",
+    "screen": "Anzeige",
     "integrations": "Integrationen",
     "status": "Status",
     "update": "Aktualisieren",
@@ -154,7 +154,7 @@
       "show_scroll": "Laufende Informationsnachricht anzeigen",
       "show_weather": "Wettervorhersage-Symbol und Mondphase anzeigen",
       "show_sprite": "Animiertes Sprite anstelle des Wetters anzeigen",
-      "sprite_weather": "Animierter Wettertyp",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto",
       "sprite_weather_clearsky": "Klarer Himmel",
       "sprite_weather_fair": "Leicht bewölkt",

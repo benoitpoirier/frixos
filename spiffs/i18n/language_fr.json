@@ -2,7 +2,7 @@
   "menu": {
     "settings": "Paramètres",
     "advanced": "Avancé",
-    "screen": "Disposition",
+    "screen": "Affichage",
     "integrations": "Intégrations",
     "status": "Statut",
     "update": "Mise à jour",
@@ -147,7 +147,7 @@
       "show_scroll": "Afficher le message d'information défilant",
       "show_weather": "Afficher l'icône de prévisions météo et la phase lunaire",
       "show_sprite": "Afficher l'animation de sprite au lieu de la météo",
-      "sprite_weather": "Type de météo animée",
+      "sprite_weather": "Animation",
       "sprite_weather_auto": "Auto",
       "sprite_weather_clearsky": "Ciel dégagé",
       "sprite_weather_fair": "Peu nuageux",

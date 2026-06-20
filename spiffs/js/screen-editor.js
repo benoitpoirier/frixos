@@ -62,6 +62,20 @@ const SCREEN_COLOR_FILTER_OPTIONS = [
     { v: 3, key: 'advanced.color_filter.blue', label: 'Blue' },
     { v: 4, key: 'advanced.color_filter.bw', label: 'Black & White' }
 ];
+const SPRITE_WEATHER_OPTIONS = [
+    { v: 0, key: 'advanced.display.sprite_weather_auto', fallback: 'Auto' },
+    { v: 1, key: 'advanced.display.sprite_weather_clearsky', fallback: 'Clear sky' },
+    { v: 9, key: 'advanced.display.sprite_weather_clearsky_night', fallback: 'Clear sky (Night)' },
+    { v: 2, key: 'advanced.display.sprite_weather_fair', fallback: 'Few clouds' },
+    { v: 10, key: 'advanced.display.sprite_weather_fair_night', fallback: 'Few clouds (Night)' },
+    { v: 3, key: 'advanced.display.sprite_weather_partlycloudy', fallback: 'Partly cloudy' },
+    { v: 11, key: 'advanced.display.sprite_weather_partlycloudy_night', fallback: 'Partly cloudy (Night)' },
+    { v: 4, key: 'advanced.display.sprite_weather_cloudy', fallback: 'Cloudy' },
+    { v: 5, key: 'advanced.display.sprite_weather_rain', fallback: 'Rain' },
+    { v: 6, key: 'advanced.display.sprite_weather_thunderstorm', fallback: 'Thunderstorm' },
+    { v: 7, key: 'advanced.display.sprite_weather_snow', fallback: 'Snow' },
+    { v: 8, key: 'advanced.display.sprite_weather_fog', fallback: 'Fog' }
+];
 const SCREEN_DEFAULT_SCROLL_TEXT = '[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]';
 const SCREEN_DEFAULT_STATIC_TEXTS = {
     text_1: 'UV [uv]',
@@ -1035,7 +1049,15 @@ function getScreenElementSize(def, elementState) {
     }
     w = def.w;
     h = def.h;
+    if (def.id === 'weather' && getScreenSpriteAnimEnabled()) {
+        w = 32;
+        h = 32;
+    }
     return { w: evenPx(w), h: evenPx(h) };
+}
+
+function getScreenSpriteAnimEnabled() {
+    return !!(window.settings && window.settings.p64);
 }
 
 function getScreenTimeFont(mode) {
@@ -1228,6 +1250,14 @@ function setupScreenSection() {
     if (saveToFileBtn) saveToFileBtn.addEventListener('click', saveScreenLayoutToFile);
     if (readFromFileBtn) readFromFileBtn.addEventListener('click', () => layoutFileInput && layoutFileInput.click());
     if (layoutFileInput) layoutFileInput.addEventListener('change', onScreenLayoutFileSelected);
+
+    const screenSettingsForm = el('screenSettingsForm');
+    if (screenSettingsForm) {
+        screenSettingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveScreenLayout();
+        });
+    }
 
     const canvas = el('screenCanvas');
     if (canvas) {
@@ -1590,8 +1620,14 @@ async function fetchScreenLayout() {
 async function saveScreenTimeDisplaySettings() {
     const leading = el('screen_show_leading_zero');
     const dots = el('screen_dots_breathe');
+    const spriteAnim = el('screen_sprite_anim');
+    const spriteWeather = el('screen_sprite_weather');
+    const spriteWait = el('screen_sprite_wait_s');
+    const spriteCycle = el('screen_sprite_cycle_s');
     const scheduleList = el('display-schedule-list');
     const auxScheduleList = el('display-schedule-aux-list');
+    const rotation = el('rotation');
+    const mirroring = el('mirroring');
 
     const formData = {};
     const gridEnabled = getScreenGridEnabled() ? 1 : 0;
@@ -1600,6 +1636,12 @@ async function saveScreenTimeDisplaySettings() {
     }
     if (leading) formData.p24 = leading.checked ? 1 : 0;
     if (dots) formData.p50 = dots.checked ? 1 : 0;
+    if (spriteAnim) formData.p64 = spriteAnim.checked ? 1 : 0;
+    if (spriteWeather) formData.p65 = parseInt(spriteWeather.value, 10) || 0;
+    if (spriteWait) formData.p66 = parseInt(spriteWait.value, 10) || 0;
+    if (spriteCycle) formData.p67 = parseInt(spriteCycle.value, 10) || 0;
+    if (rotation) formData.p03 = parseInt(rotation.value, 10) || 0;
+    if (mirroring) formData.p09 = mirroring.checked ? 1 : 0;
     if (scheduleList) {
         const newSched = serializeDisplaySchedule('display-schedule-list');
         if (newSched !== (window.settings.p58 || '')) {
@@ -1971,23 +2013,25 @@ function renderScreenOptions() {
         title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel('screen_grid')}`;
         opt.appendChild(title);
 
-        const enabledRow = document.createElement('div');
-        enabledRow.className = 'form-group';
-        const enabledLabel = document.createElement('label');
-        enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
-        const enabledInput = document.createElement('input');
-        enabledInput.type = 'checkbox';
-        enabledInput.checked = getScreenGridEnabled();
-        enabledInput.addEventListener('change', () => {
-            setScreenGridEnabled(enabledInput.checked);
-            renderScreenCanvas();
-            renderScreenPalette();
-            updateScreenStatusLine();
-            saveScreenTimeDisplaySettings();
-        });
-        enabledRow.appendChild(enabledLabel);
-        enabledRow.appendChild(enabledInput);
-        opt.appendChild(enabledRow);
+            const enabledRow = document.createElement('div');
+            enabledRow.className = 'form-group';
+            const enabledLabel = document.createElement('label');
+            enabledLabel.htmlFor = 'screen_grid_enabled';
+            enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
+            const enabledInput = document.createElement('input');
+            enabledInput.type = 'checkbox';
+            enabledInput.id = 'screen_grid_enabled';
+            enabledInput.checked = getScreenGridEnabled();
+            enabledInput.addEventListener('change', () => {
+                setScreenGridEnabled(enabledInput.checked);
+                renderScreenCanvas();
+                renderScreenPalette();
+                updateScreenStatusLine();
+                saveScreenTimeDisplaySettings();
+            });
+            enabledRow.appendChild(enabledLabel);
+            enabledRow.appendChild(enabledInput);
+            opt.appendChild(enabledRow);
         return;
     }
 
@@ -2015,9 +2059,11 @@ function renderScreenOptions() {
     const enabledRow = document.createElement('div');
     enabledRow.className = 'form-group';
     const enabledLabel = document.createElement('label');
+    enabledLabel.htmlFor = 'screen_element_enabled';
     enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
     const enabledInput = document.createElement('input');
     enabledInput.type = 'checkbox';
+    enabledInput.id = 'screen_element_enabled';
     enabledInput.checked = e.enabled !== 0;
     enabledInput.addEventListener('change', () => {
         e.enabled = enabledInput.checked ? 1 : 0;
@@ -2084,31 +2130,39 @@ function renderScreenOptions() {
         appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold', fontKey);
 
         const leadingRow = document.createElement('div');
-        leadingRow.className = 'checkbox-container';
-        const leadingInput = document.createElement('input');
-        leadingInput.type = 'checkbox';
-        leadingInput.id = 'screen_show_leading_zero';
-        leadingInput.checked = !!(window.settings && window.settings.p24);
+        leadingRow.className = 'form-group';
         const leadingLabel = document.createElement('label');
         leadingLabel.htmlFor = 'screen_show_leading_zero';
         leadingLabel.textContent = getNestedTranslation(trans, 'screen.show_leading_zero')
             || 'Show 0 for single digit hour';
-        leadingRow.appendChild(leadingInput);
+        const leadingInput = document.createElement('input');
+        leadingInput.type = 'checkbox';
+        leadingInput.id = 'screen_show_leading_zero';
+        leadingInput.checked = !!(window.settings && window.settings.p24);
+        leadingInput.addEventListener('change', () => {
+            if (window.settings) window.settings.p24 = leadingInput.checked ? 1 : 0;
+            saveScreenTimeDisplaySettings();
+        });
         leadingRow.appendChild(leadingLabel);
+        leadingRow.appendChild(leadingInput);
         opt.appendChild(leadingRow);
 
         const breatheRow = document.createElement('div');
-        breatheRow.className = 'checkbox-container';
-        const breatheInput = document.createElement('input');
-        breatheInput.type = 'checkbox';
-        breatheInput.id = 'screen_dots_breathe';
-        breatheInput.checked = !!(window.settings && window.settings.p50);
+        breatheRow.className = 'form-group';
         const breatheLabel = document.createElement('label');
         breatheLabel.htmlFor = 'screen_dots_breathe';
         breatheLabel.textContent = getNestedTranslation(trans, 'screen.disable_dots_breathe')
             || 'Disable breathing time dots';
-        breatheRow.appendChild(breatheInput);
+        const breatheInput = document.createElement('input');
+        breatheInput.type = 'checkbox';
+        breatheInput.id = 'screen_dots_breathe';
+        breatheInput.checked = !!(window.settings && window.settings.p50);
+        breatheInput.addEventListener('change', () => {
+            if (window.settings) window.settings.p50 = breatheInput.checked ? 1 : 0;
+            saveScreenTimeDisplaySettings();
+        });
         breatheRow.appendChild(breatheLabel);
+        breatheRow.appendChild(breatheInput);
         opt.appendChild(breatheRow);
 
         appendDisplayScheduleSection(opt, {
@@ -2160,6 +2214,116 @@ function renderScreenOptions() {
             descriptionKey: 'screen.display_schedule_aux.description',
             settingsKey: 'p59'
         });
+    }
+
+    if (e.id === 'weather') {
+        const animSection = document.createElement('div');
+        animSection.className = 'screen-options-subsection';
+        animSection.style.marginTop = '15px';
+        animSection.style.paddingTop = '10px';
+        animSection.style.borderTop = '1px solid var(--border-color)';
+
+        const animTitle = document.createElement('h4');
+        animTitle.style.marginBottom = '12px';
+        animTitle.style.fontSize = '0.95rem';
+        animTitle.textContent = getNestedTranslation(trans, 'advanced.display.sprite_weather') || 'Animated Sprite';
+        animSection.appendChild(animTitle);
+
+        const animRow = document.createElement('div');
+        animRow.className = 'form-group';
+        const animLabel = document.createElement('label');
+        animLabel.htmlFor = 'screen_sprite_anim';
+        animLabel.textContent = getNestedTranslation(trans, 'advanced.display.show_sprite') 
+            || 'Show animated sprite'; // Shorter label for grid
+        const animInput = document.createElement('input');
+        animInput.type = 'checkbox';
+        animInput.id = 'screen_sprite_anim';
+        animInput.checked = !!(window.settings && window.settings.p64);
+        animRow.appendChild(animLabel);
+        animRow.appendChild(animInput);
+        animSection.appendChild(animRow);
+
+        const spriteGroup = document.createElement('div');
+        spriteGroup.id = 'sprite_weather_group';
+        spriteGroup.style.display = animInput.checked ? 'flex' : 'none';
+        spriteGroup.style.flexDirection = 'column';
+        spriteGroup.style.gap = '8px';
+        spriteGroup.style.marginTop = '10px';
+        spriteGroup.style.paddingLeft = '24px';
+        
+        animInput.addEventListener('change', () => {
+            spriteGroup.style.display = animInput.checked ? 'flex' : 'none';
+            if (window.settings) {
+                window.settings.p64 = animInput.checked ? 1 : 0;
+                renderScreenCanvas();
+                saveScreenTimeDisplaySettings();
+            }
+        });
+
+        const typeRow = document.createElement('div');
+        typeRow.className = 'form-group';
+        const typeLabel = document.createElement('label');
+        typeLabel.textContent = getNestedTranslation(trans, 'advanced.display.sprite_weather') || 'Animated weather type';
+        const typeSelect = document.createElement('select');
+        typeSelect.id = 'screen_sprite_weather';
+        SPRITE_WEATHER_OPTIONS.forEach(o => {
+            const option = document.createElement('option');
+            option.value = String(o.v);
+            option.textContent = getNestedTranslation(trans, o.key) || o.fallback;
+            typeSelect.appendChild(option);
+        });
+        typeSelect.value = String(window.settings ? (window.settings.p65 || 0) : 0);
+        typeSelect.addEventListener('change', () => {
+            if (window.settings) {
+                window.settings.p65 = parseInt(typeSelect.value, 10) || 0;
+                renderScreenCanvas();
+                saveScreenTimeDisplaySettings();
+            }
+        });
+        typeRow.appendChild(typeLabel);
+        typeRow.appendChild(typeSelect);
+        spriteGroup.appendChild(typeRow);
+
+        const waitRow = document.createElement('div');
+        waitRow.className = 'form-group';
+        const waitLabel = document.createElement('label');
+        waitLabel.textContent = getNestedTranslation(trans, 'advanced.display.sprite_wait_s') || 'Wait (s)';
+        const waitInput = document.createElement('input');
+        waitInput.type = 'number';
+        waitInput.id = 'screen_sprite_wait_s';
+        waitInput.min = '0'; waitInput.max = '255';
+        waitInput.value = window.settings ? (window.settings.p66 || 0) : 0;
+        waitInput.addEventListener('change', () => {
+            if (window.settings) {
+                window.settings.p66 = parseInt(waitInput.value, 10) || 0;
+                saveScreenTimeDisplaySettings();
+            }
+        });
+        waitRow.appendChild(waitLabel);
+        waitRow.appendChild(waitInput);
+        spriteGroup.appendChild(waitRow);
+
+        const cycleRow = document.createElement('div');
+        cycleRow.className = 'form-group';
+        const cycleLabel = document.createElement('label');
+        cycleLabel.textContent = getNestedTranslation(trans, 'advanced.display.sprite_cycle_s') || 'Cycle (s)';
+        const cycleInput = document.createElement('input');
+        cycleInput.type = 'number';
+        cycleInput.id = 'screen_sprite_cycle_s';
+        cycleInput.min = '0'; cycleInput.max = '255';
+        cycleInput.value = window.settings ? (window.settings.p67 || 0) : 0;
+        cycleInput.addEventListener('change', () => {
+            if (window.settings) {
+                window.settings.p67 = parseInt(cycleInput.value, 10) || 0;
+                saveScreenTimeDisplaySettings();
+            }
+        });
+        cycleRow.appendChild(cycleLabel);
+        cycleRow.appendChild(cycleInput);
+        spriteGroup.appendChild(cycleRow);
+
+        animSection.appendChild(spriteGroup);
+        opt.appendChild(animSection);
     }
 
     if (isScreenTextElement(e.id)) {
