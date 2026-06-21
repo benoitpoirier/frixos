@@ -1712,6 +1712,7 @@ void update_graph(void)
   int slots = (g->points > 1) ? (g->points - 1) : 1;
   float px_per_slot = (float)(pw - 1) / (float)slots;
 
+
 #define V2Y(v) (py2 - (int)(((float)(v) - ymin) / yrange * (float)(ph - 1)))
 #define CY(y) ((y) < py1 ? py1 : ((y) > py2 ? py2 : (y)))
 #define I2X(i) (px2 - (int)((float)((n - 1) - (i)) * px_per_slot))
@@ -1765,7 +1766,7 @@ void update_graph(void)
     lv_draw_line_dsc_t ld;
     lv_draw_line_dsc_init(&ld);
     ld.width = 2;
-    int max_gap = g->points / 4; // empty-bin run to bridge before it's an outage
+    int max_gap = g->points / 2; // empty-bin run to bridge before it's an outage
     if (max_gap < 4)
       max_gap = 4;
     int prev = -1; // index of the last valid sample
