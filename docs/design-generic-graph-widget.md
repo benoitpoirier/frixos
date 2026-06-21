@@ -36,7 +36,7 @@ buffer** — so the same graph works for sources that only expose a "latest valu
 | How many graphs on screen | **One** (single instance). Keeps the layout's singleton-per-element model and bounds RAM. |
 | History for non-CGM sources | **Self-sample + backfill where available** (HA `/api/history`, CGM cloud batch). Weather/stock start empty and fill as sampled. |
 | "Time unit" semantics | It is the **sample interval**, range **1–1440 min**. Total window = interval × points (≤100). |
-| Graph size | Width **60–90 px**, height **28–60 px** (max 90×60 — see §6 memory). |
+| Graph size | Width **60–80 px**, height **28–36 px** (max & default 80×36 — see §6 memory). |
 | Colour format | **I4 indexed** (16-colour palette). |
 | Versioning | **v1, no backward compatibility** — none of these formats are distributed yet, so wire `format` stays **1** and structs are defined fresh. |
 | int16 precision | `int16_t` raw values are sufficient — **no** per-graph scale factor. |
@@ -181,7 +181,7 @@ Adapted from PR #180's `update_cgm_graph()`: an LVGL canvas with a polyline, opt
 band, threshold colouring, and small axis markers.
 
 ### 6.1 Canvas size & colour format — DECIDED (RGB565)
-Max configured size is **90 × 60**.
+Max (and default) configured size is **80 × 36**.
 
 > **Implementation constraint (LVGL 9.5):** I4 was the chosen format, but the LVGL **software
 > renderer has no blend-to-I4 path** — its drawable canvas destinations are only A8, AL88,
@@ -190,14 +190,15 @@ Max configured size is **90 × 60**.
 > on the ST7735 software path. **We therefore use RGB565** — the format PR #180 used — which is fully
 > drawable and proven on this hardware.
 
-| Format | Bytes at max 90×60 | Drawable target? | Colour |
+| Format | Bytes at max 80×36 | Drawable target? | Colour |
 |---|---|---|---|
-| **RGB565 — CHOSEN** | 90·60·2 = **10,800** | ✅ yes | full colour |
+| **RGB565 — CHOSEN** | 80·36·2 = **5,760** | ✅ yes | full colour |
 | I4 indexed | 2,700 | ❌ **no SW blend handler** | n/a |
 | L8 | 5,400 | ✅ yes | grayscale only |
 | I1 | 675 | ✅ yes | mono, no band fill |
 
-RGB565 at max 90×60 is **~10.8 KB** — comfortable for a single graph against ~70 KB free heap.
+RGB565 at max 80×36 is **~5.76 KB** — and the canvas is allocated at the *configured* size, so it's
+usually smaller. Comfortable against ~70 KB free heap, even when it coincides with a CGM TLS fetch.
 (If RAM ever becomes tight, L8 grayscale at 5.4 KB is the fallback that keeps a drawable target,
 at the cost of colour.)
 
@@ -224,8 +225,8 @@ typedef struct __attribute__((packed)) {
     char     token[64];        // selected token string (stable across HA/stock reindex; 64 fits [HA:...] tokens)
     uint16_t interval_min;     // 1..1440
     uint8_t  points;           // 2..100
-    uint8_t  width;            // 60..90
-    uint8_t  height;           // 28..60
+    uint8_t  width;            // 60..80
+    uint8_t  height;           // 28..36
     int16_t  band_low;         // low threshold (graph units; INT16_MIN = unset)
     int16_t  band_high;        // high threshold (INT16_MIN = unset)
     uint8_t  flags;            // bit0 auto-scale Y, bit1 show axis, bit2 band on,
@@ -246,8 +247,8 @@ typedef struct __attribute__((packed)) {
   defined fresh (no migration path, no V1→V2 reader). `FRIXOS_SCREEN_LAYOUT_VERSION` may be bumped
   if convenient but is not required for compatibility.
 - Update the four `_Static_assert`s to the new profile/wire sizes (profile grows by ~48 B).
-- `sanitize_widget()` / decode clamps every new field (interval 1–1440, points 2–100, W 60–90,
-  H 28–60) exactly like PR #180 did for its CGM fields.
+- `sanitize_widget()` / decode clamps every new field (interval 1–1440, points 2–100, W 60–80,
+  H 28–36) exactly like PR #180 did for its CGM fields.
 
 ---
 
@@ -286,11 +287,11 @@ snapshot-then-draw keeps them disjoint.
 | Item | Bytes |
 |---|---|
 | Ring buffer (`graph_ring_t`) | ~250 |
-| Canvas (RGB565, max 90×60) | ~10,800 |
+| Canvas (RGB565, max 80×36) | ~5,760 |
 | Layout cfg added to NVS/wire (×2 profiles) | ~112 |
-| **Runtime total** | **~11 KB** |
+| **Runtime total** | **~6 KB** |
 
-Against ~70 KB typical free heap with the existing `MIN_FREE_HEAP`/per-fetch guards, ~11 KB is
+Against ~70 KB typical free heap with the existing `MIN_FREE_HEAP`/per-fetch guards, ~6 KB is
 acceptable for a single graph. The canvas is allocated once at layout-apply (max configured size),
 never reallocated in the sampler/render path.
 
@@ -338,7 +339,8 @@ Deferred (later):
 
 ## 14. Resolved decisions
 
-1. **Colour format** — **I4 indexed** (§6.1). Max canvas 90×60 ≈ 2.76 KB.
+1. **Colour format** — RGB565 (I4 isn't a drawable target in LVGL 9.5, §6.1). Max canvas 80×36 ≈ 5.76 KB,
+   allocated at the configured size.
 2. **Fixed-point scale** — **`int16_t` raw values, no scale factor.** Sub-unit precision not needed;
    values that are naturally fractional (e.g. temp) are rounded to the nearest integer for plotting.
 3. **HA backfill size** — request history and **consume as much as fits one HTTP buffer**. Implemented

@@ -41,8 +41,8 @@ for prof in range(2):
     data[g:g + 64] = tok + b"\x00" * (64 - len(tok))
     struct.pack_into("<H", data, g + 64, 5)    # interval_min = 5
     data[g + 66] = 60                          # points
-    data[g + 67] = 90                          # width
-    data[g + 68] = 40                          # height
+    data[g + 67] = 80                          # width
+    data[g + 68] = 36                          # height
     data[g + 69] = flags
     for o in (70, 72, 74, 76):                 # band_low/high, y_min/max = unset
         struct.pack_into("<h", data, g + o, -32768)

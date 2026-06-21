@@ -586,7 +586,7 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'text_6', label: 'Text 6', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_6 },
     { id: 'text_7', label: 'Text 7', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_7 },
     { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 },
-    { id: 'graph', label: 'Graph', w: 90, h: 40, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true }
+    { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true }
 ];
 
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
@@ -912,8 +912,8 @@ function screenReadGraphCfg(view, off) {
         token: screenReadFixedString(view, off + GCFG.TOKEN, SCREEN_BIN_GRAPH_TOKEN_LEN),
         interval_min: view.getUint16(off + GCFG.INTERVAL, true) || 5,
         points: view.getUint8(off + GCFG.POINTS) || 60,
-        gwidth: view.getUint8(off + GCFG.WIDTH) || 90,
-        gheight: view.getUint8(off + GCFG.HEIGHT) || 40,
+        gwidth: view.getUint8(off + GCFG.WIDTH) || 80,
+        gheight: view.getUint8(off + GCFG.HEIGHT) || 36,
         autoscale: !!(flags & GRAPH_FLAG.AUTOSCALE),
         show_axis: !!(flags & GRAPH_FLAG.SHOW_AXIS),
         band_on: !!(flags & GRAPH_FLAG.BAND),
@@ -936,8 +936,8 @@ function screenWriteGraphCfg(view, off, o) {
     screenWriteFixedString(view, off + GCFG.TOKEN, SCREEN_BIN_GRAPH_TOKEN_LEN, o.token || '');
     view.setUint16(off + GCFG.INTERVAL, o.interval_min != null ? o.interval_min : 5, true);
     view.setUint8(off + GCFG.POINTS, o.points != null ? o.points : 60);
-    view.setUint8(off + GCFG.WIDTH, o.gwidth != null ? o.gwidth : 90);
-    view.setUint8(off + GCFG.HEIGHT, o.gheight != null ? o.gheight : 40);
+    view.setUint8(off + GCFG.WIDTH, o.gwidth != null ? o.gwidth : 80);
+    view.setUint8(off + GCFG.HEIGHT, o.gheight != null ? o.gheight : 36);
     let flags = 0;
     if (o.autoscale) flags |= GRAPH_FLAG.AUTOSCALE;
     if (o.show_axis) flags |= GRAPH_FLAG.SHOW_AXIS;
@@ -2208,7 +2208,7 @@ function appendScreenTokenButtons(container, textarea) {
 function ensureScreenGraphOptions(e) {
     if (!e.options) e.options = {};
     const d = {
-        token: '', interval_min: 5, points: 60, gwidth: 90, gheight: 40,
+        token: '', interval_min: 5, points: 60, gwidth: 80, gheight: 36,
         autoscale: true, show_axis: true, show_value: true, backfill: true,
         band_on: false, boolean: false,
         band_low: null, band_high: null, y_min: null, y_max: null,
@@ -2552,8 +2552,8 @@ function renderScreenOptions() {
 
         mkNumber(T('screen.graph_interval', 'Sample interval (min)'), o.interval_min, 1, 1440, v => o.interval_min = clamp(parseInt(v, 10) || 5, 1, 1440));
         mkNumber(T('screen.graph_points', 'Data points'), o.points, 2, 100, v => o.points = clamp(parseInt(v, 10) || 60, 2, 100));
-        mkNumber(T('screen.graph_width', 'Width (px)'), o.gwidth, 60, 90, v => o.gwidth = clamp(parseInt(v, 10) || 90, 60, 90));
-        mkNumber(T('screen.graph_height', 'Height (px)'), o.gheight, 28, 60, v => o.gheight = clamp(parseInt(v, 10) || 40, 28, 60));
+        mkNumber(T('screen.graph_width', 'Width (px)'), o.gwidth, 60, 80, v => o.gwidth = clamp(parseInt(v, 10) || 80, 60, 80));
+        mkNumber(T('screen.graph_height', 'Height (px)'), o.gheight, 28, 36, v => o.gheight = clamp(parseInt(v, 10) || 36, 28, 36));
 
         appendScreenSwitchRow(opt, { id: 'graph_autoscale', label: T('screen.graph_autoscale', 'Auto Y-scale'), checked: !!o.autoscale, onChange: (on) => { o.autoscale = on; renderScreenOptions(); } });
         if (!o.autoscale) {
