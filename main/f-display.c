@@ -1755,6 +1755,11 @@ void update_graph(void)
     ymin = 0.0f;
     ymax = 10.0f;
   }
+  // Snap the Y bounds to whole units: ceil the top, floor the bottom, so the
+  // axis labels are clean integers and the scale matches them.
+  ymax = ceilf(ymax / 10.0f) * 10.0f;
+  ymin = floorf(ymin / 10.0f) * 10.0f;
+  if (ymax <= ymin) ymax = ymin + 10.0f;
   float yrange = ymax - ymin;
   if (yrange < 1e-6f) yrange = 1.0f;
 
@@ -1828,10 +1833,10 @@ void update_graph(void)
     lb.opa = LV_OPA_COVER;
     lb.text_local = 1; // deferred draw: strdup the stack strings
 
-    bool ydec = (yrange < 200.0f); // real range < 20 -> show 1 decimal
+    // Y bounds are whole units (ceil/floor) -> integer labels.
     char ymax_s[8], ymin_s[8];
-    graph_fmt(ymax_s, sizeof(ymax_s), ymax, ydec);
-    graph_fmt(ymin_s, sizeof(ymin_s), ymin, ydec);
+    graph_fmt(ymax_s, sizeof(ymax_s), ymax, false);
+    graph_fmt(ymin_s, sizeof(ymin_s), ymin, false);
     lb.align = LV_TEXT_ALIGN_RIGHT;
     lb.text = ymax_s;
     lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
@@ -1845,7 +1850,7 @@ void update_graph(void)
     lb.text = xnow;
     // Wide enough that "now" never overflows (the w was clipping), right edge
     // 6px in from the plot edge; raised 1px above the other x label.
-    lv_area_t xar = {px2 - 28, py2 - 1, px2 - 6, gh - 1};
+    lv_area_t xar = {px2 - 24, py2 - 1, px2 - 2, gh - 1};
     lv_draw_label(&layer, &lb, &xar);
 
     // Window duration label, e.g. 60 points x 1 min -> "-1h", x 5 min -> "-5h".
