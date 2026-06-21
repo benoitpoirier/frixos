@@ -1539,13 +1539,6 @@ static int metno_process_buffer(char *buf, int buf_used, bool final)
  */
 bool wifi_get_metno_sunrise(void)
 {
-    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    if (free_heap < 20000)
-    {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: low heap %d (need ~20K), skipping", free_heap);
-        return false;
-    }
-
     if (!validate_coordinate(my_lat, true) || !validate_coordinate(my_lon, false))
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: invalid coordinates, skipping");
@@ -1591,6 +1584,16 @@ bool wifi_get_metno_sunrise(void)
     if (!acquire_ssl_semaphore("wifi_get_metno_sunrise"))
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Sunrise: SSL lock failed");
+        return false;
+    }
+
+    // Heap check after the lock (see wifi_get_metno_weather) so a concurrent
+    // integration TLS doesn't make us skip a fetch we'd otherwise have room for.
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    if (free_heap < 20000)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: low heap %d after lock, skipping", free_heap);
+        release_ssl_semaphore();
         return false;
     }
 
@@ -1686,13 +1689,6 @@ bool wifi_get_metno_sunrise(void)
  */
 bool wifi_get_metno_weather(void)
 {
-    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    if (free_heap < 20000)
-    {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Met.no: low heap %d (need ~20K), skipping", free_heap);
-        return false;
-    }
-
     if (!validate_coordinate(my_lat, true) || !validate_coordinate(my_lon, false))
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: invalid coordinates '%s','%s'", my_lat, my_lon);
@@ -1756,6 +1752,19 @@ bool wifi_get_metno_weather(void)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: SSL lock failed");
         is_metno_request = false;
+        return false;
+    }
+
+    // Check heap AFTER acquiring the SSL lock: any concurrent integration TLS
+    // (e.g. a CGM fetch) has now released its ~20 KB, so this reflects the heap
+    // actually available to us — not a transient dip that would make us skip
+    // even though serialization would have given us room.
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    if (free_heap < 20000)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Met.no: low heap %d after lock, skipping", free_heap);
+        is_metno_request = false;
+        release_ssl_semaphore();
         return false;
     }
 
