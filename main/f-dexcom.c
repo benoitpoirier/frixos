@@ -13,6 +13,7 @@
 #include "f-membuffer.h"
 #include "f-json.h"
 #include "f-dexcom.h"
+#include "f-graph.h" // shared CGM history for the graph widget backfill
 #include "frixos.h"
 #include "cJSON.h"
 
@@ -335,7 +336,11 @@ bool fetch_dexcom_glucose()
         // Step 3: Fetch glucose data
         const char *base_url = DEXCOM_BASE_URLS[eeprom_dexcom_region];
         char url[384];
-        snprintf(url, sizeof(url), "%s/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=%s&minutes=1440&maxCount=2", base_url, dexcom_session_id);
+        // maxCount=24 (was 2): Dexcom readings are ~130 B each and fit one HTTP
+        // buffer (4096); seeds the graph history while the latest two still drive
+        // the current reading. minutes=1440 = last 24h. (Handler discards the
+        // whole response on overflow, so keep within the buffer.)
+        snprintf(url, sizeof(url), "%s/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=%s&minutes=1440&maxCount=24", base_url, dexcom_session_id);
         //snprintf(url, sizeof(url), "https://share2.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=e629db54-0854-48d6-8e96-2252fe66750a&minutes=1440&maxCount=4");
 
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom fetch %s", url);
@@ -371,6 +376,18 @@ bool fetch_dexcom_glucose()
                 cJSON *root = cJSON_Parse(dexcom_response_buffer);
                 if (root && cJSON_IsArray(root) && cJSON_GetArraySize(root) >= 1)
                 {
+                    // Capture all readings into the shared CGM history for the graph.
+                    cgm_history_begin();
+                    int arr_n = cJSON_GetArraySize(root);
+                    for (int i = 0; i < arr_n; i++)
+                    {
+                        cJSON *it = cJSON_GetArrayItem(root, i);
+                        cJSON *iv = cJSON_GetObjectItem(it, "Value");
+                        cJSON *iwt = cJSON_GetObjectItem(it, "WT");
+                        if (cJSON_IsNumber(iv) && cJSON_IsString(iwt))
+                            cgm_history_add((float)iv->valuedouble, parse_dexcom_timestamp(iwt->valuestring));
+                    }
+
                     cJSON *latest = cJSON_GetArrayItem(root, 0);
                     cJSON *previous = cJSON_GetArraySize(root) > 1 ? cJSON_GetArrayItem(root, 1) : NULL;
 

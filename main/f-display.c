@@ -118,9 +118,13 @@ lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 
-// Generic graph widget canvas (RGB565, allocated once at max GRAPH_MAX_W x GRAPH_MAX_H).
+// Generic graph widget canvas (RGB565). The buffer is lazily (re)allocated at
+// the configured width x height to keep heap pressure low — important when the
+// graph coincides with a heavy TLS fetch (e.g. CGM). Realloc only happens on
+// the display task under the LVGL lock, so it never races the renderer.
 lv_obj_t *graph_canvas = NULL;
 static uint8_t *graph_canvas_buf = NULL;
+static size_t graph_canvas_buf_size = 0;
 lv_obj_t *label_digit = NULL;
 lv_obj_t *label_digit_aux = NULL;
 static lv_obj_t *label_degree = NULL;
@@ -1617,27 +1621,13 @@ void update_graph(void)
       {
         free(graph_canvas_buf);
         graph_canvas_buf = NULL;
+        graph_canvas_buf_size = 0;
       }
       lvgl_port_unlock();
       last_render_shown = false;
       last_render_sample = -1;
     }
     return;
-  }
-
-  // Lazily allocate the RGB565 buffer at the maximum configured size on first
-  // enable; the sampler/render path never reallocates after this.
-  if (!graph_canvas_buf)
-  {
-    size_t cap = (size_t)GRAPH_MAX_W * GRAPH_MAX_H * 2;
-    graph_canvas_buf = malloc(cap);
-    if (!graph_canvas_buf)
-    {
-      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "graph_canvas_buf alloc %u failed", (unsigned)cap);
-      return;
-    }
-    memset(graph_canvas_buf, 0, cap);
-    last_render_sample = -1; // force a redraw now that we have a buffer
   }
 
   int16_t samp[GRAPH_MAX_POINTS];
@@ -1728,6 +1718,21 @@ void update_graph(void)
 
   lvgl_port_lock(0);
   lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
+  // (Re)allocate the RGB565 buffer at the configured size (under the LVGL lock,
+  // display task only — never races the renderer). Smaller than max => less heap.
+  size_t need = (size_t)gw * gh * 2;
+  if (graph_canvas_buf_size != need)
+  {
+    uint8_t *nb = realloc(graph_canvas_buf, need);
+    if (!nb)
+    {
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "graph_canvas_buf alloc %u failed", (unsigned)need);
+      lvgl_port_unlock();
+      return;
+    }
+    graph_canvas_buf = nb;
+    graph_canvas_buf_size = need;
+  }
   lv_canvas_set_buffer(graph_canvas, graph_canvas_buf, gw, gh, LV_COLOR_FORMAT_RGB565);
   lv_canvas_fill_bg(graph_canvas, col_bg, LV_OPA_COVER);
   lv_layer_t layer;

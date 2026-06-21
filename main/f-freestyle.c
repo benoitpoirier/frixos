@@ -12,6 +12,7 @@
 #include "f-integrations.h"
 #include "f-membuffer.h"
 #include "f-time.h"
+#include "f-graph.h" // shared CGM history for the graph widget backfill
 
 static const char *TAG = "f-freestyle";
 #define LIBRE_CLIENT_VERSION "4.20.0"
@@ -435,6 +436,32 @@ static void process_glucose_chunk(const char *chunk, int len)
         
         // Move search position past the end of this object to find next occurrence
         search_pos = obj_end + 1;
+    }
+
+    // Capture graphData history points for the graph widget. Each graphData
+    // object (and the latest glucoseMeasurement) carries FactoryTimestamp +
+    // ValueInMgPerDl; we publish each fully-bounded one (dedup by timestamp in
+    // cgm_history_add). A point is "bounded" when a following FactoryTimestamp
+    // exists in the window, so we never read a value truncated by the chunk
+    // boundary; the very last point per window is captured on a later scan.
+    char *gp = glucose_chunk_buffer;
+    while ((gp = strstr(gp, "\"FactoryTimestamp\"")) != NULL)
+    {
+        char *next = strstr(gp + 1, "\"FactoryTimestamp\"");
+        if (!next)
+            break; // unbounded tail; capture on a later scan
+        char ts_str[64];
+        time_t ts = 0;
+        if (extract_string_value(gp, next, ts_str, sizeof(ts_str)))
+            ts = parse_utc_timestamp(ts_str);
+        char *vfield = strstr(gp, "\"ValueInMgPerDl\"");
+        if (ts > 0 && vfield && vfield < next)
+        {
+            double mgdl = extract_numeric_value(vfield, next);
+            if (mgdl > 0 && mgdl < 1000)
+                cgm_history_add((float)mgdl, ts);
+        }
+        gp = next;
     }
 }
 
@@ -901,6 +928,7 @@ bool fetch_freestyle_glucose(void)
         latest_glucose_value = 0.0;
         latest_trend_arrow = 0;
         latest_timestamp = 0;
+        cgm_history_begin(); // collect graphData history for the graph widget
 
         // Update URL and method for this request
         esp_http_client_set_url(freestyle_client, graph_url);
@@ -922,6 +950,10 @@ bool fetch_freestyle_glucose(void)
             if (status_code == 200)
             {
                 success = true; // HTTP request succeeded
+                // Ensure the newest reading is in the graph history (it may be
+                // the unbounded last point the streaming capture skipped).
+                if (latest_glucose_value > 0 && latest_timestamp > 0)
+                    cgm_history_add((float)latest_glucose_value, latest_timestamp);
                 // Use the latest glucose value extracted from chunks
                 if (latest_timestamp > glucose_data.timestamp)
                 {

@@ -6,9 +6,16 @@ Generalises the CGM-specific graph contributed by **Benoit Poirier** in PR #180
 work; this design extends it from CGM-only to any numeric token. Credit to Benoit Poirier.
 
 > Implementation notes: `GRAPH_TOKEN_LEN` is 64 (HA tokens are long); the screen wire size is
-> **3704** bytes (graph cfg 88 B/profile). Self-sampling + HA `/api/history` backfill are live and
-> verified on-device. CGM-batch backfill remains a follow-up (this build keeps no shared CGM
-> history array). Colour format is RGB565 (LVGL 9.5 can't draw to I4 — see §6.1).
+> **3704** bytes (graph cfg 88 B/profile). Self-sampling + HA `/api/history` backfill + **CGM
+> backfill (all three vendors)** are live and verified on-device. Colour format is RGB565 (LVGL 9.5
+> can't draw to I4 — see §6.1); the canvas is allocated at the *configured* size (not max) to keep
+> heap headroom when it coincides with a heavy TLS fetch.
+>
+> CGM backfill uses a shared in-RAM history store (`cgm_history_*` in f-graph.c) that the vendor
+> fetchers publish into: Freestyle/LibreLinkUp captures `graphData[]` as it streams through the
+> chunk buffer; Nightscout/Dexcom widen their array fetch (count 12 / maxCount 24 — bounded to fit
+> one HTTP buffer so the existing latest-reading parse can't regress) and capture each reading. The
+> graph backfill reads the store for `[CGM:*]` tokens and re-arms until a fetch has populated it.
 
 ---
 

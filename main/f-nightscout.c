@@ -12,6 +12,7 @@
 #include "f-integrations.h"
 #include "f-membuffer.h"
 #include "f-nightscout.h"
+#include "f-graph.h" // shared CGM history for the graph widget backfill
 #include "cJSON.h"
 
 static const char *TAG = "f-nightscout";
@@ -167,7 +168,11 @@ bool fetch_nightscout_glucose(void)
     url_buf[sizeof(url_buf) - 1] = '\0';
     if (base_len > 0 && url_buf[base_len - 1] == '/')
         url_buf[base_len - 1] = '\0';
-    strncat(url_buf, "/api/v1/entries.json?count=2", sizeof(url_buf) - strlen(url_buf) - 1);
+    // count=12 (was 2): NS entries are ~250-300 B each and the response buffer
+    // is HTTP_BUFFER_SIZE (4096); 12 fits with margin (the handler discards the
+    // whole response on overflow, so we must not exceed it). Seeds the graph
+    // history; the latest two still drive the current reading.
+    strncat(url_buf, "/api/v1/entries.json?count=12", sizeof(url_buf) - strlen(url_buf) - 1);
 
     char api_secret_hex[41];
     // only set api-secret if password is set
@@ -207,6 +212,24 @@ bool fetch_nightscout_glucose(void)
             cJSON *root = cJSON_Parse(nightscout_response_buffer);
             if (root && cJSON_IsArray(root) && cJSON_GetArraySize(root) >= 1)
             {
+                // Capture all entries into the shared CGM history for the graph.
+                cgm_history_begin();
+                int arr_n = cJSON_GetArraySize(root);
+                for (int i = 0; i < arr_n; i++)
+                {
+                    cJSON *e = cJSON_GetArrayItem(root, i);
+                    cJSON *e_sgv = cJSON_GetObjectItem(e, "sgv");
+                    cJSON *e_date = cJSON_GetObjectItem(e, "date");
+                    if (!cJSON_IsNumber(e_sgv))
+                        continue;
+                    time_t e_ts = 0;
+                    if (cJSON_IsNumber(e_date))
+                        e_ts = (time_t)((int64_t)(e_date->valuedouble) / 1000);
+                    else if (cJSON_IsString(e_date))
+                        e_ts = (time_t)(atoll(e_date->valuestring) / 1000);
+                    cgm_history_add((float)e_sgv->valuedouble, e_ts);
+                }
+
                 cJSON *latest = cJSON_GetArrayItem(root, 0);
                 cJSON *previous = cJSON_GetArraySize(root) > 1 ? cJSON_GetArrayItem(root, 1) : NULL;
 

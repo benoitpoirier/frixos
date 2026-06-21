@@ -63,4 +63,16 @@ bool graph_take_backfill_request(char *token_out, size_t token_len,
 // value GRAPH_VAL_UNSET are treated as gaps. Safe to call from any task.
 void graph_backfill(const float *vals, const time_t *times, int n, time_t now);
 
+// Re-arm a backfill request (e.g. when a CGM history source isn't ready yet),
+// so graph_take_backfill_request() returns it again next cycle.
+void graph_request_backfill(void);
+
+// --- Shared CGM history -------------------------------------------------
+// Producers: the per-vendor CGM fetchers (dexcom/freestyle/nightscout) publish
+// the recent readings they retrieve. Consumer: graph backfill for [CGM:*]
+// tokens. Mutex-guarded; dedup by timestamp; keeps the newest GRAPH_MAX_POINTS.
+void cgm_history_begin(void);                          // clear before a fresh capture
+void cgm_history_add(float mgdl, time_t ts);           // add one reading (mg/dL, UTC epoch)
+int cgm_history_get(float *vals, time_t *times, int max); // copy out (returns count)
+
 #endif /* F_GRAPH_H */

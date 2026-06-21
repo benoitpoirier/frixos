@@ -165,6 +165,71 @@ bool graph_take_backfill_request(char *token_out, size_t token_len,
   return req;
 }
 
+void graph_request_backfill(void)
+{
+  GRAPH_LOCK();
+  if (ring.active)
+    ring.needs_backfill = true;
+  GRAPH_UNLOCK();
+}
+
+// --- Shared CGM history -------------------------------------------------
+static float cgm_v[GRAPH_MAX_POINTS];
+static time_t cgm_t[GRAPH_MAX_POINTS];
+static int cgm_n;
+
+void cgm_history_begin(void)
+{
+  GRAPH_LOCK();
+  cgm_n = 0;
+  GRAPH_UNLOCK();
+}
+
+void cgm_history_add(float mgdl, time_t ts)
+{
+  if (mgdl <= 0 || ts <= 0)
+    return;
+  GRAPH_LOCK();
+  for (int i = 0; i < cgm_n; i++)
+    if (cgm_t[i] == ts) // dedup by timestamp
+    {
+      GRAPH_UNLOCK();
+      return;
+    }
+  if (cgm_n < GRAPH_MAX_POINTS)
+  {
+    cgm_v[cgm_n] = mgdl;
+    cgm_t[cgm_n] = ts;
+    cgm_n++;
+  }
+  else
+  {
+    int oldest = 0; // full: evict the oldest if this sample is newer
+    for (int i = 1; i < GRAPH_MAX_POINTS; i++)
+      if (cgm_t[i] < cgm_t[oldest])
+        oldest = i;
+    if (ts > cgm_t[oldest])
+    {
+      cgm_v[oldest] = mgdl;
+      cgm_t[oldest] = ts;
+    }
+  }
+  GRAPH_UNLOCK();
+}
+
+int cgm_history_get(float *vals, time_t *times, int max)
+{
+  GRAPH_LOCK();
+  int n = cgm_n < max ? cgm_n : max;
+  for (int i = 0; i < n; i++)
+  {
+    vals[i] = cgm_v[i];
+    times[i] = cgm_t[i];
+  }
+  GRAPH_UNLOCK();
+  return n;
+}
+
 void graph_backfill(const float *vals, const time_t *times, int n, time_t now)
 {
   GRAPH_LOCK();

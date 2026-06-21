@@ -693,7 +693,27 @@ static void graph_service_backfill(void)
     if (!graph_take_backfill_request(token, sizeof(token), &interval_min, &points))
         return;
 
-    // Only HA tokens ([HA:entity:path]) have a history source here.
+    // CGM tokens ([CGM:...]): seed from the shared history the vendor fetchers
+    // publish. If it isn't populated yet (no CGM fetch since enable), re-arm so
+    // we retry on the next cycle once a fetch has run.
+    if (strncmp(token, "[CGM", 4) == 0)
+    {
+        static float cv[GRAPH_MAX_POINTS];
+        static time_t ct[GRAPH_MAX_POINTS];
+        int n = cgm_history_get(cv, ct, GRAPH_MAX_POINTS);
+        if (n > 0)
+        {
+            graph_backfill(cv, ct, n, time(NULL));
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfilled %d points from CGM", n);
+        }
+        else
+        {
+            graph_request_backfill(); // CGM history not captured yet; retry next cycle
+        }
+        return;
+    }
+
+    // Only HA tokens ([HA:entity:path]) have a remote history endpoint here.
     if (strncmp(token, "[HA:", 4) != 0)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfill: %s self-samples (no history source)", token);
