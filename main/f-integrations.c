@@ -608,10 +608,15 @@ static void graph_backfill_from_ha(const char *entity, const char *path, uint16_
     ha_response_len = 0;
     ha_response_buffer[0] = '\0';
 
+    // For an attribute path (e.g. current_temperature) HA only returns it on
+    // every state row, so request the full response (no minimal_response) AND
+    // significant_changes_only=0 — otherwise HA collapses to just the current
+    // state-change (the climate mode), giving a single point.
     char url[URL_BUFFER_SIZE];
     snprintf(url, sizeof(url),
              "%s/api/history/period/%s?filter_entity_id=%s%s&end_time=%s",
-             eeprom_ha_url, start_iso, entity, want_state ? "&minimal_response" : "", end_iso);
+             eeprom_ha_url, start_iso, entity,
+             want_state ? "&minimal_response" : "&significant_changes_only=0", end_iso);
 
     esp_http_client_config_t config = {
         .url = url,
