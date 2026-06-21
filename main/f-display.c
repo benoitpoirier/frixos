@@ -1384,9 +1384,15 @@ static void render_digit_group(lv_obj_t *objs[NUM_DIGITS], const digit_display_t
 
 static void update_cgm_dots_visibility(lv_obj_t *dot_objs[2], bool show_slot, const digit_display_t *dd)
 {
+  // Only adjust the dots when showing glucose: dot[0] becomes the mmol decimal
+  // point, dot[1] is unused. For time (or weather/HA) leave them exactly as the
+  // caller set them, otherwise the time colon gets hidden and isn't restored
+  // when switching back from glucose.
+  if (!show_slot)
+    return;
   const bool is_mmol = (dd && dd->is_mmol) || eeprom_glucose_unit == 1;
   show_object(dot_objs[1], false);
-  show_object(dot_objs[0], show_slot && is_mmol);
+  show_object(dot_objs[0], is_mmol);
 }
 
 static void apply_digit_display_visibility(lv_obj_t *digits[NUM_DIGITS], lv_obj_t *dot_objs[2],
