@@ -20,10 +20,21 @@ staticToggle.addEventListener('click', () => { staticToggle.classList.toggle('on
 const msg = el('message'), msgCounter = el('message-counter');
 if (msg) msg.addEventListener('input', () => { msgCounter.textContent = msg.value.length + ' / 511'; });
 
+/* Only treat the WiFi password as changed when the user actually edits it.
+   Without this, a browser/password-manager autofill leaves a value in the
+   field that gets sent as p35 — overwriting the stored password and forcing a
+   network-critical restart even when the user only touched an unrelated
+   setting (e.g. display rotation). The field is cleared (autofill discarded)
+   until the user types. */
+let wifiPassDirty = false;
+const wifiPass = el('wifi_pass');
+if (wifiPass) wifiPass.addEventListener('input', () => { wifiPassDirty = true; });
+
 /* ---------- SETTINGS ---------- */
 async function loadSettings() {
   await loadGroup('group=settings&params=p03,p09,p16');
   delete window.settings.p35; // never keep WiFi password in memory
+  if (wifiPass) { wifiPass.value = ''; wifiPassDirty = false; } // discard any browser autofill
   const s = S();
   setVal('hostname', s.p00); setVal('wifi_ssid', s.p34);
   if (s.p03 !== undefined) el('rotation').value = String(s.p03);
@@ -46,7 +57,7 @@ el('saveSettings').addEventListener('click', () => {
   const p = {};
   changed(p, 'p00', host.value.trim());
   changed(p, 'p34', el('wifi_ssid').value);
-  changedSecret(p, 'p35', el('wifi_pass').value);
+  if (wifiPassDirty) changedSecret(p, 'p35', el('wifi_pass').value);
   changed(p, 'p03', parseInt(el('rotation').value, 10) || 0);
   changed(p, 'p09', swOn('mirroring') ? 1 : 0);
   changed(p, 'p36', swOn('fahrenheit') ? 1 : 0);

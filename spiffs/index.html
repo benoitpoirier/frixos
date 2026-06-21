@@ -69,9 +69,9 @@
       <div class="ptitle"><h2>Connection</h2><span class="rule"></span></div>
       <div class="conn-grid">
         <div class="conn-fields">
-          <div class="field"><label>WiFi SSID <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="username" placeholder="Network name"></div>
+          <div class="field"><label>WiFi SSID <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" placeholder="Network name"></div>
           <div class="field"><label>WiFi password <span class="req">*</span></label>
-            <div class="pw"><input type="password" id="wifi_pass" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+            <div class="pw"><input type="password" id="wifi_pass" autocomplete="new-password" placeholder="Leave blank to keep current"><button class="eye" type="button" aria-label="Show password">👁</button></div>
           </div>
           <div class="field"><label>Hostname <span class="req">*</span></label>
             <input type="text" id="hostname" value="frixos" required maxlength="32"><span class="err" id="hostname-err">Hostname is required.</span>
