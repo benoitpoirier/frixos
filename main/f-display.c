@@ -1788,7 +1788,8 @@ void update_graph(void)
   lv_layer_t layer;
   lv_canvas_init_layer(graph_canvas, &layer);
 
-  // 1. Low/high band.
+  // 1. Low/high band: shade the in-range zone, then draw a crisp horizontal
+  //    line at each threshold (axis colour) so the band levels are unmistakable.
   if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET && g->band_high > g->band_low)
   {
     int yh = CY(V2Y(g->band_high * 10));
@@ -1803,6 +1804,15 @@ void update_graph(void)
       lv_area_t ba = {px1, yh, px2, yl};
       lv_draw_rect(&layer, &bd, &ba);
     }
+    lv_draw_line_dsc_t bl;
+    lv_draw_line_dsc_init(&bl);
+    bl.width = 1;
+    bl.color = col_axis;
+    bl.opa = LV_OPA_COVER;
+    bl.p1.x = px1; bl.p1.y = yh; bl.p2.x = px2; bl.p2.y = yh; // high threshold
+    lv_draw_line(&layer, &bl);
+    bl.p1.x = px1; bl.p1.y = yl; bl.p2.x = px2; bl.p2.y = yl; // low threshold
+    lv_draw_line(&layer, &bl);
   }
 
   // (The trend polyline is drawn after finish_layer with direct pixels — see
@@ -1860,7 +1870,9 @@ void update_graph(void)
     lv_draw_label(&layer, &lb, &xal);
   }
 
-  // 4. Current value readout (top-right of plot).
+  // 4. Current value readout, placed just above or below the latest point so
+  //    the trend line doesn't run through the digits: below it when the line
+  //    sits in the upper half of the plot, above it when it sits in the lower.
   if (show_value && last_valid != GRAPH_VAL_UNSET)
   {
     lv_draw_label_dsc_t vb;
@@ -1873,7 +1885,11 @@ void update_graph(void)
     char vt[12];
     graph_fmt(vt, sizeof(vt), (float)last_valid, (yrange < 200.0f));
     vb.text = vt;
-    lv_area_t va = {px1, py1, px2, py1 + 8};
+    int vy = CY(V2Y((float)last_valid));
+    int vtop = ((vy - py1) < (py2 - py1) / 2) ? (vy + 2) : (vy - 10);
+    if (vtop < py1) vtop = py1;
+    if (vtop + 8 > py2) vtop = py2 - 8;
+    lv_area_t va = {px1, vtop, px2, vtop + 8};
     lv_draw_label(&layer, &vb, &va);
   }
 
