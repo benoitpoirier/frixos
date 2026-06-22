@@ -642,6 +642,12 @@ void create_grid(lv_obj_t *scr)
 {
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Create grid");
 
+  // The grid is a calibration overlay: it must sit above everything (digits,
+  // images, graph canvas) at all times. Parent it to the display's dedicated
+  // top layer, which always renders above the active screen's children, so we
+  // never have to fight the per-widget z-order.
+  scr = lv_layer_top();
+
   static lv_point_precise_t v_points[][2] = {
       {{20, 0}, {20, 128}},
       {{30, 0}, {30, 128}},
