@@ -607,110 +607,76 @@ esp_err_t startup_lvgl(void)
   return ESP_OK;
 }
 
-lv_obj_t *grid[64];
-int grid_objs = 0;
+// The calibration grid is drawn as a screen-level overlay, NOT as a set of
+// lv_line objects. On this heap-constrained device the min free heap can dip to
+// ~1 KB during TLS handshakes (weather/CGM); the previous ~14 line objects'
+// persistent object/style allocations were enough to tip the system into OOM
+// and reset it once the graph/CGM/weather paths were active. A draw callback
+// costs zero persistent heap, and because it runs on LV_EVENT_DRAW_POST of the
+// screen (after all children are rendered) it is always on top.
 
-static void raise_grid_foreground(void)
+static bool grid_cb_registered = false;
+
+// Reference grid line positions in 128x128 panel space. Vertical lines are red,
+// horizontal lines green, with a green centre cross at x=64 / y=64.
+static const int32_t grid_v_lines[] = {20, 30, 40, 90, 100, 110};
+static const int32_t grid_h_lines[] = {20, 30, 40, 90, 100, 110};
+
+static void grid_draw_event_cb(lv_event_t *e)
 {
-  if (!eeprom_show_grid || !grid_objs)
+  if (!eeprom_show_grid)
     return;
 
-  for (int i = 0; i < grid_objs; i++)
-    lv_obj_move_foreground(grid[i]);
+  lv_layer_t *layer = lv_event_get_layer(e);
+
+  lv_draw_line_dsc_t dsc;
+  lv_draw_line_dsc_init(&dsc);
+  dsc.width = 1;
+  dsc.opa = LV_OPA_COVER;
+
+  // Vertical lines (red).
+  dsc.color = lv_color_make(0xFF, 0x00, 0x00);
+  for (size_t i = 0; i < sizeof(grid_v_lines) / sizeof(grid_v_lines[0]); i++)
+  {
+    dsc.p1.x = grid_v_lines[i]; dsc.p1.y = 0;
+    dsc.p2.x = grid_v_lines[i]; dsc.p2.y = 128;
+    lv_draw_line(layer, &dsc);
+  }
+
+  // Horizontal lines + centre cross (green).
+  dsc.color = lv_color_make(0x00, 0xFF, 0x00);
+  for (size_t i = 0; i < sizeof(grid_h_lines) / sizeof(grid_h_lines[0]); i++)
+  {
+    dsc.p1.x = 0;   dsc.p1.y = grid_h_lines[i];
+    dsc.p2.x = 128; dsc.p2.y = grid_h_lines[i];
+    lv_draw_line(layer, &dsc);
+  }
+  dsc.p1.x = 64; dsc.p1.y = 0;   dsc.p2.x = 64;  dsc.p2.y = 128; // centre V
+  lv_draw_line(layer, &dsc);
+  dsc.p1.x = 0;  dsc.p1.y = 64;  dsc.p2.x = 128; dsc.p2.y = 64;  // centre H
+  lv_draw_line(layer, &dsc);
+}
+
+// Retained for source compatibility with the old object-based grid: the draw
+// callback already renders on top of all children, so nothing to re-raise.
+static void raise_grid_foreground(void) {}
+
+void create_grid(lv_obj_t *scr)
+{
+  if (grid_cb_registered)
+    return;
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Register grid overlay");
+  lv_obj_add_event_cb(scr, grid_draw_event_cb, LV_EVENT_DRAW_POST, NULL);
+  grid_cb_registered = true;
 }
 
 void show_grid(uint8_t show)
 {
-  if (show)
-  {
-    if (!grid_objs) // has grid been created yet?
-      create_grid(lv_scr_act());
-
-    for (int i = 0; i < grid_objs; i++)
-      lv_obj_clear_flag(grid[i], LV_OBJ_FLAG_HIDDEN);
-
-    raise_grid_foreground();
-  }
-  else
-  {
-    for (int i = 0; i < grid_objs; i++)
-      lv_obj_add_flag(grid[i], LV_OBJ_FLAG_HIDDEN);
-  }
-}
-
-void create_grid(lv_obj_t *scr)
-{
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Create grid");
-
-  // The grid is a calibration overlay: it must sit above everything (digits,
-  // images, graph canvas) at all times. Parent it to the display's dedicated
-  // top layer, which always renders above the active screen's children, so we
-  // never have to fight the per-widget z-order.
-  scr = lv_layer_top();
-
-  static lv_point_precise_t v_points[][2] = {
-      {{20, 0}, {20, 128}},
-      {{30, 0}, {30, 128}},
-      {{40, 0}, {40, 128}},
-      {{90, 0}, {90, 128}},
-      {{100, 0}, {100, 128}},
-      {{110, 0}, {110, 128}},
-  };
-
-  static lv_point_precise_t h_points[][2] = {
-      {{0, 20}, {128, 20}},
-      {{0, 30}, {128, 30}},
-      {{0, 40}, {128, 40}},
-      {{0, 90}, {128, 90}},
-      {{0, 100}, {128, 100}},
-      {{0, 110}, {128, 110}},
-  };
-
-  // 1) Vertical lines (red)
-  for (int i = 0; i < sizeof(v_points) / sizeof(v_points[0]); i++)
-  {
-
-    lv_obj_t *line_v = lv_line_create(scr);
-    lv_line_set_points(line_v, v_points[i], 2);
-
-    lv_obj_set_style_line_color(line_v, lv_color_make(0xFF, 0x00, 0x00), 0);
-    lv_obj_set_style_line_width(line_v, 1, 0); // Changed to 1 pixel
-    lv_obj_set_style_line_opa(line_v, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_opa(line_v, LV_OPA_TRANSP, 0);
-    grid[grid_objs++] = line_v;
-  }
-
-  // 2) Horizontal lines (green)
-  for (int i = 0; i < sizeof(h_points) / sizeof(h_points[0]); i++)
-  {
-    lv_obj_t *line_h = lv_line_create(scr);
-    lv_line_set_points(line_h, h_points[i], 2);
-
-    lv_obj_set_style_line_color(line_h, lv_color_make(0x00, 0xFF, 0x00), 0);
-    lv_obj_set_style_line_width(line_h, 1, 0); // Changed to 1 pixel
-    lv_obj_set_style_line_opa(line_h, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_opa(line_h, LV_OPA_TRANSP, 0);
-    grid[grid_objs++] = line_h;
-  }
-
-  static lv_point_precise_t center_v[] = {{64, 0}, {64, 128}};
-  static lv_point_precise_t center_h[] = {{0, 64}, {128, 64}};
-
-  lv_obj_t *line_cv = lv_line_create(scr);
-  lv_line_set_points(line_cv, center_v, 2);
-  lv_obj_set_style_line_color(line_cv, lv_color_make(0x00, 0xFF, 0x00), 0);
-  lv_obj_set_style_line_width(line_cv, 1, 0);
-  lv_obj_set_style_line_opa(line_cv, LV_OPA_COVER, 0);
-  lv_obj_set_style_bg_opa(line_cv, LV_OPA_TRANSP, 0);
-  grid[grid_objs++] = line_cv;
-
-  lv_obj_t *line_ch = lv_line_create(scr);
-  lv_line_set_points(line_ch, center_h, 2);
-  lv_obj_set_style_line_color(line_ch, lv_color_make(0x00, 0xFF, 0x00), 0);
-  lv_obj_set_style_line_width(line_ch, 1, 0);
-  lv_obj_set_style_line_opa(line_ch, LV_OPA_COVER, 0);
-  lv_obj_set_style_bg_opa(line_ch, LV_OPA_TRANSP, 0);
-  grid[grid_objs++] = line_ch;
+  // eeprom_show_grid is the source of truth read by the draw callback; just make
+  // sure the overlay callback is installed, then invalidate so the toggle shows.
+  (void)show;
+  create_grid(lv_scr_act());
+  lv_obj_invalidate(lv_scr_act());
 }
 
 // warning - assumes it is running in a port lock/unlock wrapper
