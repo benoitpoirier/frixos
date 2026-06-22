@@ -1709,12 +1709,14 @@ void update_graph(void)
   // ymin/ymax are in ring units (value x10), matching samp[]. Config values
   // (y_min/y_max, band) are real units, so they are x10 where used.
   float ymin, ymax;
+  const bool manual_range = (!autoscale && g->y_min != GRAPH_VAL_UNSET &&
+                             g->y_max != GRAPH_VAL_UNSET && g->y_max > g->y_min);
   if (boolean)
   {
     ymin = 0.0f;
     ymax = 10.0f; // 1 x10
   }
-  else if (!autoscale && g->y_min != GRAPH_VAL_UNSET && g->y_max != GRAPH_VAL_UNSET && g->y_max > g->y_min)
+  else if (manual_range)
   {
     ymin = (float)g->y_min * 10.0f;
     ymax = (float)g->y_max * 10.0f;
@@ -1734,6 +1736,19 @@ void update_graph(void)
     ymin = 0.0f;
     ymax = 10.0f;
   }
+  // Keep the high/low bands on screen: when bands are enabled and the scale is
+  // auto (not an explicit fixed y_min/y_max), widen the range to include both
+  // thresholds so they never fall off the top or bottom of the plot.
+  if (band_on && !boolean && !manual_range &&
+      g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET &&
+      g->band_high > g->band_low)
+  {
+    const float bl = (float)g->band_low * 10.0f;
+    const float bh = (float)g->band_high * 10.0f;
+    if (bl < ymin) ymin = bl;
+    if (bh > ymax) ymax = bh;
+  }
+
   // Snap the Y bounds to whole units: ceil the top, floor the bottom, so the
   // axis labels are clean integers and the scale matches them.
   ymax = ceilf(ymax / 10.0f) * 10.0f;
