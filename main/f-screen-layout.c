@@ -47,7 +47,10 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     p->widget[SCREEN_ELEM_GLUCOSE_LEVEL] = (screen_widget_t){.enabled = 1, .x = 27, .y = 27, .z = 4};
     p->widget[SCREEN_ELEM_GLUCOSE_TREND] = (screen_widget_t){.enabled = 1, .x = 42, .y = 30, .z = 4};
     p->widget[SCREEN_ELEM_WIFI_OFF] = (screen_widget_t){.enabled = 1, .x = 22, .y = 27, .z = 4};
-    p->widget[SCREEN_ELEM_WEATHER] = (screen_widget_t){.enabled = 1, .x = 54, .y = 24, .z = 3};
+    // Weather visibility is now owned by this widget's .enabled flag (see the
+    // show_object() gate in f-display.c). Seed it from the legacy quiet_weather
+    // setting so a v66->v67 upgrade preserves a user who hid the forecast.
+    p->widget[SCREEN_ELEM_WEATHER] = (screen_widget_t){.enabled = eeprom_quiet_weather ? 1 : 0, .x = 54, .y = 24, .z = 3};
     p->widget[SCREEN_ELEM_MOON] = (screen_widget_t){.enabled = 1, .x = 87, .y = 29, .z = 3};
     p->widget[SCREEN_ELEM_TIME] = (screen_widget_t){.enabled = 1, .x = 22, .y = 47, .z = 1};
     p->widget[SCREEN_ELEM_AMPM] = (screen_widget_t){.enabled = 1, .x = 101, .y = 54, .z = 2};
@@ -85,7 +88,10 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     p->digit_label_text[0] = '\0';
     p->digit_label_aux_text[0] = '\0';
     p->widget[SCREEN_ELEM_MESSAGE] = (screen_widget_t){
-        .enabled = 1,
+        // Message visibility is owned by .enabled (see show_object gate in
+        // f-display.c). Seed from legacy quiet_scroll so a v66->v67 upgrade
+        // preserves a user who turned the scrolling message off.
+        .enabled = eeprom_quiet_scroll ? 1 : 0,
         .x = 0,
         .y = 86,
         .z = 0,
@@ -158,6 +164,7 @@ void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout)
                         ? layout->profile[0].widget[SCREEN_ELEM_MESSAGE].font
                         : 0;
   eeprom_quiet_scroll = layout->profile[0].widget[SCREEN_ELEM_MESSAGE].enabled;
+  eeprom_quiet_weather = layout->profile[0].widget[SCREEN_ELEM_WEATHER].enabled;
 }
 
 void screen_layout_ensure_valid(void)
