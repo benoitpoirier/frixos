@@ -223,6 +223,7 @@ static char last_scroll_msg[SCROLL_MSG_LENGTH];
 static uint8_t last_scroll_font = 0xFF; // font index active when last_scroll_msg was set
 
 LV_FONT_DECLARE(frixos_8);
+LV_FONT_DECLARE(graph_tiny5); // 5px pixel font (Tiny5) for graph axis labels
 LV_FONT_DECLARE(frixos_10);
 LV_FONT_DECLARE(frixos_11);
 LV_FONT_DECLARE(frixos_12);
@@ -1834,7 +1835,7 @@ void update_graph(void)
 
     lv_draw_label_dsc_t lb;
     lv_draw_label_dsc_init(&lb);
-    lb.font = &frixos_8;
+    lb.font = &graph_tiny5; // compact 5px font for the x/y axis labels
     lb.color = col_axis;
     lb.opa = LV_OPA_COVER;
     lb.text_local = 1; // deferred draw: strdup the stack strings

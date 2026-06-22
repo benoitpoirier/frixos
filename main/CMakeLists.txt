@@ -24,6 +24,7 @@ idf_component_register(SRCS
     "frixos_14.c"
     "frixos_16.c"
     "font-pixelate_10.c"
+    "graph_tiny5.c"
     "f-membuffer.c"
     "f-json.c"
     "f-dexcom.c"
