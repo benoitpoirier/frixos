@@ -1857,7 +1857,7 @@ void update_graph(void)
     lb.text = xnow;
     // Wide enough that "now" never overflows (the w was clipping), right edge
     // 6px in from the plot edge; raised 1px above the other x label.
-    lv_area_t xar = {px2 - 24, py2 - 1, px2 - 2, gh - 1};
+    lv_area_t xar = {px2 - 24, py2 + 1, px2 - 2, gh - 1};
     lv_draw_label(&layer, &lb, &xar);
 
     // Window duration label, e.g. 60 points x 1 min -> "-1h", x 5 min -> "-5h".
@@ -1869,7 +1869,7 @@ void update_graph(void)
       snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
     lb.align = LV_TEXT_ALIGN_LEFT;
     lb.text = xleft;
-    lv_area_t xal = {px1, py2, px1 + 22, gh - 1}; // +1px of height
+    lv_area_t xal = {px1, py2 + 2, px1 + 22, gh - 1};
     lv_draw_label(&layer, &lb, &xal);
   }
 
