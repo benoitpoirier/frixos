@@ -713,6 +713,12 @@ function isScreenMetaElement(id) {
     return isScreenSettingsElement(id);
 }
 
+// Last grid (p08) state known to be persisted on the device. Tracked separately
+// from window.settings.p08 because the toggle mutates window.settings.p08 live
+// (for the canvas preview) before the save runs -- if the save diffed against
+// window.settings.p08 it would always see "no change" and never POST p08.
+let screenGridDeviceState = 0;
+
 function getScreenGridEnabled() {
     return !!(window.settings && window.settings.p08);
 }
@@ -1736,6 +1742,7 @@ async function fetchScreenLayout() {
         if (settingsResp) {
             mergeSettingsData(settingsResp);
         }
+        screenGridDeviceState = (window.settings && window.settings.p08) ? 1 : 0;
         if (!response.ok) {
             throw new Error(`Screen layout fetch failed: HTTP ${response.status}`);
         }
@@ -1765,7 +1772,7 @@ async function saveScreenTimeDisplaySettings() {
 
     const formData = {};
     const gridEnabled = getScreenGridEnabled() ? 1 : 0;
-    if (window.settings && gridEnabled !== (window.settings.p08 || 0)) {
+    if (gridEnabled !== screenGridDeviceState) {
         formData.p08 = gridEnabled;
     }
     if (leading) {
@@ -1800,6 +1807,7 @@ async function saveScreenTimeDisplaySettings() {
         const data = await response.json().catch(() => ({}));
         if (response.ok && data && data.status === 'ok') {
             Object.assign(window.settings, formData);
+            if ('p08' in formData) screenGridDeviceState = formData.p08;
             return true;
         }
         return false;
