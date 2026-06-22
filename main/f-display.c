@@ -1709,7 +1709,7 @@ void update_graph(void)
   lv_color_t col_warn = lv_color_make(g->warn_r, g->warn_g, g->warn_b);
   lv_color_t col_axis = lv_color_make(g->axis_r, g->axis_g, g->axis_b);
 
-  int left_m = show_axis ? 19 : 1; // room for 3-digit Y labels
+  int left_m = show_axis ? 17 : 1; // 16px fits 4 Tiny5 digits (4px adv) exactly
   int top_m = 1;
   int right_m = 1;
   int bot_m = show_axis ? 8 : 1;
