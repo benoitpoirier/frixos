@@ -2135,7 +2135,7 @@ async function appendScreenThemeFilterOptions(container, trans) {
 function appendScreenGridOption(container, trans) {
     appendScreenSwitchRow(container, {
         id: 'screen_show_grid',
-        label: getScreenElementLabel('screen_grid'),
+        label: getScreenTranslation('screen.show_grid', 'Screen Grid'),
         checked: getScreenGridEnabled(),
         onChange: (on) => {
             setScreenGridEnabled(on);
