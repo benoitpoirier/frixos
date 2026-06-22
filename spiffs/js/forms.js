@@ -48,8 +48,12 @@ async function loadSettings() {
     setVal('static_ip', ''); setVal('static_gw', ''); setVal('static_nm', ''); setVal('static_dns1', ''); setVal('static_dns2', '');
   }
   if (s.p16 !== undefined && msg) { msg.value = s.p16 || ''; msgCounter.textContent = msg.value.length + ' / 511'; }
+  if (typeof populateSettingsLayoutSelect === 'function') await populateSettingsLayoutSelect();
 }
 sectionLoaders.settings = loadSettings;
+
+const settingsLayoutLoadBtn = el('settingsLayoutLoadBtn');
+if (settingsLayoutLoadBtn) settingsLayoutLoadBtn.addEventListener('click', () => applySettingsLayoutToDevice());
 
 el('saveSettings').addEventListener('click', () => {
   const host = el('hostname');

@@ -32,6 +32,8 @@
 .layout-picker select{ flex:1; min-width:180px; }
 .layout-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
 .layout-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.layout-mgmt{ margin:4px 0 16px; }
+.layout-mgmt .city-row{ flex-wrap:wrap; }
 .seg{ display:flex; gap:3px; padding:4px; border-radius:999px; background:var(--tabs-bg); border:1px solid var(--tabs-border); }
 .seg-btn{ border:none; background:none; cursor:pointer; font-family:var(--ui); font-size:13px; font-weight:500; color:var(--tab-ink);
   padding:7px 18px; border-radius:999px; transition:all .2s; }

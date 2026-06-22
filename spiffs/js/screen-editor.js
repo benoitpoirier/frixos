@@ -489,21 +489,20 @@ function getScreenLayoutFileNames() {
     return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
 
-async function refreshScreenLayoutSelect() {
-    await ensureScreenSpiffsFiles(true);
-    const select = el('screenLayoutSelect');
-    if (!select) return;
-
-    const trans = translations[currentLanguage] || translations.en;
-    const placeholderText = getNestedTranslation(trans, 'screen.layout_file_placeholder') || 'Select a layout file';
+// Fill a <select> with "Current" (value '') followed by every .layout file on
+// the device. Returns the list of file names. Shared by the layout editor and
+// the Settings > Display dropdown.
+function fillLayoutSelect(selectId) {
+    const select = el(selectId);
+    if (!select) return [];
     const previous = select.value;
     const names = getScreenLayoutFileNames();
 
     select.innerHTML = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = placeholderText;
-    select.appendChild(placeholder);
+    const current = document.createElement('option');
+    current.value = '';
+    current.textContent = getScreenTranslation('screen.layout_current', 'Current');
+    select.appendChild(current);
 
     names.forEach(name => {
         const option = document.createElement('option');
@@ -512,12 +511,76 @@ async function refreshScreenLayoutSelect() {
         select.appendChild(option);
     });
 
-    if (names.includes(previous)) {
-        select.value = previous;
-    }
+    select.value = names.includes(previous) ? previous : '';
+    return names;
+}
 
+async function refreshScreenLayoutSelect() {
+    await ensureScreenSpiffsFiles(true);
+    const names = fillLayoutSelect('screenLayoutSelect');
     const loadBtn = el('screenLoadSystemBtn');
     if (loadBtn) loadBtn.disabled = names.length === 0;
+}
+
+// Settings > Display "Layout" dropdown: same file list, but selecting a file and
+// pressing Load applies it straight to the device (there is no editor there).
+async function populateSettingsLayoutSelect() {
+    await ensureScreenSpiffsFiles(true);
+    const names = fillLayoutSelect('settingsLayoutSelect');
+    const loadBtn = el('settingsLayoutLoadBtn');
+    if (loadBtn) loadBtn.disabled = names.length === 0;
+}
+
+async function applySettingsLayoutToDevice() {
+    const select = el('settingsLayoutSelect');
+    const btn = el('settingsLayoutLoadBtn');
+    const filename = select && select.value;
+    if (!filename) return; // "Current" selected -> nothing to load
+
+    try {
+        toggleLoading(btn, true);
+        showStatus(getMessage('saving_settings'), 'info');
+        const response = await fetch('/' + encodeURIComponent(filename));
+        if (!response.ok) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
+        const data = await response.json();
+        if (!data || !data.profiles) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
+
+        const layout = prepareScreenLayout(data);
+        layout.version = SCREEN_LAYOUT_VERSION;
+        ensureScreenLayoutMeta(layout);
+        ensureScreenProfileShape(layout.profiles.day);
+        ensureScreenProfileShape(layout.profiles.night);
+
+        const body = encodeScreenLayoutBinary(layout);
+        if (body.byteLength !== SCREEN_BIN_WIRE_SIZE) {
+            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_WIRE_SIZE}`);
+        }
+        const post = await fetch('/api/screen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body
+        });
+        const pdata = await post.json().catch(() => ({}));
+        if (post.ok && pdata && pdata.status === 'ok') {
+            // Keep the editor and cached settings in sync with what we pushed.
+            window.screenLayout = layout;
+            if (window.settings) {
+                window.settings.p04 = layout.day_font;
+                window.settings.p05 = layout.night_font;
+                window.settings.p10 = layout.day_color_filter;
+                window.settings.p11 = layout.night_color_filter;
+            }
+            showStatus(getMessage('layout_applied'), 'success');
+        } else {
+            const detail = pdata && pdata.error ? pdata.error : 'Unknown error';
+            showStatus(getMessage('layout_apply_failed') + detail, 'error');
+        }
+    } catch (error) {
+        console.error('Error applying layout:', error);
+        showStatus(getMessage('layout_apply_failed') + (error.message || ''), 'error');
+    } finally {
+        toggleLoading(btn, false);
+    }
 }
 
 function hasSpiffsFile(name) {
@@ -1370,7 +1433,6 @@ function setupScreenSection() {
     const btnDay = el('screenModeDay');
     const btnNight = el('screenModeNight');
     const saveBtn = el('screenSaveBtn');
-    const restoreDefaultBtn = el('screenRestoreDefaultBtn');
     const loadSystemBtn = el('screenLoadSystemBtn');
     const copyBtn = el('screenCopyBtn');
     const saveToFileBtn = el('screenSaveToFileBtn');
@@ -1380,7 +1442,6 @@ function setupScreenSection() {
     if (btnDay) btnDay.addEventListener('click', () => setScreenMode('day'));
     if (btnNight) btnNight.addEventListener('click', () => setScreenMode('night'));
     if (saveBtn) saveBtn.addEventListener('click', saveScreenLayout);
-    if (restoreDefaultBtn) restoreDefaultBtn.addEventListener('click', restoreScreenDefaults);
     if (loadSystemBtn) loadSystemBtn.addEventListener('click', loadSystemScreenLayout);
     if (copyBtn) copyBtn.addEventListener('click', copyScreenLayoutToOtherMode);
     if (saveToFileBtn) saveToFileBtn.addEventListener('click', saveScreenLayoutToFile);
@@ -1914,10 +1975,7 @@ async function loadSystemScreenLayout() {
     const select = el('screenLayoutSelect');
     const loadBtn = el('screenLoadSystemBtn');
     const filename = select && select.value;
-    if (!filename) {
-        showStatus(getMessage('layout_system_select_file'), 'error');
-        return;
-    }
+    if (!filename) return; // "Current" selected -> editor already shows it
     try {
         toggleLoading(loadBtn, true);
         const response = await fetch('/' + encodeURIComponent(filename));
