@@ -1394,6 +1394,16 @@ static void apply_digit_display_visibility(lv_obj_t *digits[NUM_DIGITS], lv_obj_
 
 static void apply_widget_visibility(const screen_layout_profile_t *layout)
 {
+  // Boot splash: until the clock is synced, keep only the frixos logo and the
+  // boot message (Starting.../IP/etc.) on screen. Everything else was hidden at
+  // startup and is revealed here only once we have a valid time. (This runs at
+  // boot via display_changed(), before the first NTP sync.)
+  if (!time_valid)
+  {
+    show_object(label_msg, true);
+    return;
+  }
+
   const screen_widget_t *w_weather = &layout->widget[SCREEN_ELEM_WEATHER];
   const screen_widget_t *w_moon = &layout->widget[SCREEN_ELEM_MOON];
   const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
@@ -1622,6 +1632,11 @@ static void graph_px_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, int w, i
 void update_graph(void)
 {
   if (!graph_canvas)
+    return;
+
+  // The graph is part of the layout: during the boot splash (no time yet) it
+  // stays hidden, like everything except the logo and the boot message.
+  if (!time_valid)
     return;
 
   const screen_layout_profile_t *layout_p = &eeprom_screen_layout.profile[font_index];
@@ -2359,8 +2374,10 @@ static void handle_integration_and_messages(void)
       lv_image_set_offset_x(img_glucose, -glucose_index * 14);
       lv_image_set_offset_x(img_glucose_trend, -glucose_data.trend_arrow * 12);
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-      show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
-      show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_fresh());
+      // Gated on time_valid so the glucose icons stay hidden during the boot
+      // splash (this block can run pre-sync via the boot-IP path).
+      show_object(img_glucose, time_valid && layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
+      show_object(img_glucose_trend, time_valid && layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_fresh());
       lvgl_port_unlock();
     }
     else
