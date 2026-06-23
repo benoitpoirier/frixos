@@ -2034,11 +2034,10 @@ function copyScreenLayoutToOtherMode() {
     const sourceProfile = getProfileObj(source);
     if (!sourceProfile) return;
 
-    // Copy the whole look -- element placement, texts, graph, and the per-mode
-    // colour filter -- but keep the target's own Theme/Font, since day and night
-    // intentionally differ there (e.g. a lighter font at night).
+    // Copy the layout profile (element placement, texts, graph) only. The
+    // per-mode Theme/Font and colour filter are intentionally kept as-is, since
+    // day and night are meant to differ there (e.g. a lighter font at night).
     window.screenLayout.profiles[target] = JSON.parse(JSON.stringify(sourceProfile));
-    window.screenLayout[`${target}_color_filter`] = window.screenLayout[`${source}_color_filter`];
     const trans = translations[currentLanguage] || translations.en;
     const sourceLabel = getNestedTranslation(trans, `screen.${source}`) || source;
     const targetLabel = getNestedTranslation(trans, `screen.${target}`) || target;
