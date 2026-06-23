@@ -17,8 +17,8 @@ const setSw = (id, on) => { const g = el(id); if (g) g.classList.toggle('on', !!
 const staticToggle = el('staticToggle'), staticPanel = el('staticPanel');
 staticToggle.addEventListener('click', () => { staticToggle.classList.toggle('on'); staticPanel.hidden = !staticToggle.classList.contains('on'); });
 
-const msg = el('message'), msgCounter = el('message-counter');
-if (msg) msg.addEventListener('input', () => { msgCounter.textContent = msg.value.length + ' / 511'; });
+/* The scrolling message is edited only in the Layout palette (per day/night
+   profile); there is no Settings-tab field for it. */
 
 /* Only treat the WiFi password as changed when the user actually edits it.
    Without this, a browser/password-manager autofill leaves a value in the
@@ -32,7 +32,7 @@ if (wifiPass) wifiPass.addEventListener('input', () => { wifiPassDirty = true; }
 
 /* ---------- SETTINGS ---------- */
 async function loadSettings() {
-  await loadGroup('group=settings&params=p03,p09,p16');
+  await loadGroup('group=settings&params=p03,p09');
   delete window.settings.p35; // never keep WiFi password in memory
   if (wifiPass) { wifiPass.value = ''; wifiPassDirty = false; } // discard any browser autofill
   const s = S();
@@ -47,7 +47,6 @@ async function loadSettings() {
   } else {
     setVal('static_ip', ''); setVal('static_gw', ''); setVal('static_nm', ''); setVal('static_dns1', ''); setVal('static_dns2', '');
   }
-  if (s.p16 !== undefined && msg) { msg.value = s.p16 || ''; msgCounter.textContent = msg.value.length + ' / 511'; }
   if (typeof populateSettingsLayoutSelect === 'function') await populateSettingsLayoutSelect();
 }
 sectionLoaders.settings = loadSettings;
@@ -67,7 +66,6 @@ el('saveSettings').addEventListener('click', () => {
   changed(p, 'p36', swOn('fahrenheit') ? 1 : 0);
   changed(p, 'p37', swOn('hour12') ? 1 : 0);
   changed(p, 'p39', swOn('update_firmware') ? 1 : 0);
-  if (msg) changed(p, 'p16', msg.value);
   const wasStatic = !!(S().p60 && String(S().p60).trim());
   const useStatic = swOn('staticToggle');
   if (useStatic) {
