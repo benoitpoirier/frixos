@@ -4,6 +4,7 @@
 #include "f-wifi.h"
 #include "f-membuffer.h"
 #include "f-integrations.h"
+#include "config.h"
 
 #include "esp_chip_info.h"
 #include "esp_flash.h"
@@ -1194,6 +1195,12 @@ static bool ota_query_latest(int *new_version)
 void f_ota_check_update(void)
 {
     ESP_LOGI_STACK(TAG, "OTA Check Update");
+
+#if FRIXOS_DISABLE_AUTO_OTA
+    // Dev build flashed with idf.py: never replace it with a published release.
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Automatic OTA disabled in this build (DISABLE_AUTO_OTA=1)");
+    return;
+#endif
 
     if (!wifi_connected)
     {
