@@ -938,6 +938,15 @@ bool fetch_freestyle_glucose(void)
         // Update URL and method for this request
         esp_http_client_set_url(freestyle_client, graph_url);
         esp_http_client_set_method(freestyle_client, HTTP_METHOD_GET);
+        // The client may have been recreated (cleanup after a failure) or last used for
+        // login (POST body), so always re-apply auth headers and drop any stale body.
+        esp_http_client_set_post_field(freestyle_client, NULL, 0);
+        char auth_header[512 + 7 + 1];
+        snprintf(auth_header, sizeof(auth_header), "Bearer %s", eeprom_libre_token);
+        esp_http_client_set_header(freestyle_client, "authorization", auth_header);
+        char id_hash[65];
+        generateSHA256((const unsigned char *)libre_account_id, id_hash);
+        esp_http_client_set_header(freestyle_client, "account-id", id_hash);
 
         if (!acquire_ssl_semaphore("fetch_freestyle_glucose"))
         {
