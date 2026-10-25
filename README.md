@@ -1,8 +1,16 @@
-# Frixos
-
+# Frixos <sub><sup>by Benoit</sup></sub>
 **Daylight Projection Clock with Smart Home Integration and Biometric Monitoring**
 
 **[Frixos Store → buyfrixos.com](https://buyfrixos.com)**
+
+> **Fork notice:** As of **25/10/2026**, this firmware version no longer tracks the original Git repository ([ArtLogicIKE/frixos](https://github.com/ArtLogicIKE/frixos)), so it can integrate features that ArtLogicIKE has not validated.
+>
+> **What this version adds over the official firmware:**
+>
+> - **Unified text and number widget**, which makes it possible:
+>   - to resize and color the font for the time and the scrolling message
+>   - to choose a specific weather theme
+>   - to hide units on particular values
 
 Frixos is an open-source firmware for the Frixos daylight projection clock—a WiFi-enabled device that projects time, weather, and biometric data onto any surface. Built on **ESP-IDF 6.0.1** for ESP32, it features a web-based provisioning portal, multilingual settings UI, and integrations with popular smart home and health platforms.
 
