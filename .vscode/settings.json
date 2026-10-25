@@ -32,7 +32,7 @@
     "lv_image_decoder.h": "c"
   },
   "idf.pythonInstallPath": "C:\\Espressif\\python_env\\idf6.0_py3.13_env\\Scripts\\python.exe",
-  "idf.currentSetup": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.currentSetup": "/opt/esp/idf",
   "idf.eimIdfJsonPath": "C:\\Espressif\\tools\\eim_idf.json",
   "idf.buildPath": "${workspaceFolder}/build",
   "idf.extensionActivationMode": "always",
