@@ -1,4 +1,6 @@
 {
+  "git.autofetch": false,
+  "git.autorefresh": false,
   "C_Cpp.intelliSenseEngine": "default",
   "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
   "idf.espIdfPathWin": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
