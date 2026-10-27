@@ -30,6 +30,7 @@
   --tabs-bg:rgba(255,255,255,.55);
   --tabs-border:rgba(255,255,255,.85);
   --tab-ink:#7b818b; --tab-active-ink:#0a4a63; --tab-active-bg:#fff;
+  --brand-by:#4a86ad;
   --disc:radial-gradient(58% 58% at 34% 26%, #ffffff, #cfd4db 58%, #9aa1ac);
   --switch-off:rgba(140,148,160,.32);
   --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #dde0e5);
@@ -59,6 +60,7 @@
   --tabs-bg:rgba(255,255,255,.04);
   --tabs-border:rgba(255,255,255,.08);
   --tab-ink:#7a828f; --tab-active-ink:#04222e; --tab-active-bg:var(--cyan);
+  --brand-by:#8fc6e6;
   --disc:radial-gradient(58% 58% at 34% 26%, #f2f5f8, #aeb6c0 58%, #6a717b);
   --switch-off:#252b34;
   --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #cfd4db);

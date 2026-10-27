@@ -34,6 +34,7 @@ body.has-savebar .wrap{ padding-bottom:96px; }
 }
 .disc img{ height:17px; border-radius:50%; }
 .brand{ font-family:var(--jost); font-weight:500; font-size:20px; letter-spacing:.06em; color:var(--ink); }
+.brand-by{ margin-left:.05em; font-weight:400; font-style:italic; font-size:.72em; letter-spacing:.04em; color:var(--brand-by); opacity:.9; }
 .topbar .spring{ flex:1; }
 .ctrl{
   width:36px; height:36px; flex:none; border-radius:50%; border:1px solid var(--hairline);
