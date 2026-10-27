@@ -12,7 +12,10 @@
 >   - to choose a specific weather theme
 >   - to hide units on particular values
 > - **Collapsible admin panels** in the Device, Integrations and System tabs (collapsed by default, except the first System panel)
-> - **Projection area overlay** on the live screen capture: a grey circle (92% of the width) marks the area visible on the wall, the corners outside it are dimmed
+> - **Live screen capture** in the Device tab, to see in real time what the Frixos is projecting:
+>   - on-demand refresh, optional capture when the page opens and auto-refresh (10 s, 30 s or 1 min)
+>   - download of the capture as a PNG
+>   - a subtle circle marks the area actually visible on the wall, the corners outside it are dimmed
 
 Frixos is an open-source firmware for the Frixos daylight projection clock—a WiFi-enabled device that projects time, weather, and biometric data onto any surface. Built on **ESP-IDF 6.0.1** for ESP32, it features a web-based provisioning portal, multilingual settings UI, and integrations with popular smart home and health platforms.
 
