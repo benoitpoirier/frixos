@@ -115,6 +115,10 @@ body.has-savebar .wrap{ padding-bottom:96px; }
   box-shadow:0 0 0 1px rgba(0,0,0,.35) inset, 0 0 22px rgba(0,170,230,.12), 0 12px 26px -18px rgba(0,0,0,.8); }
 .shot-frame canvas{ display:block; width:256px; max-width:calc(100% - 28px); aspect-ratio:1; height:auto; border-radius:7px; image-rendering:pixelated; box-shadow:0 0 0 1px rgba(130,210,255,.2), 0 0 13px rgba(0,170,230,.12); }
 .shot-frame canvas[hidden],.shot-loading[hidden]{ display:none; }
+.shot-frame canvas,.shot-mask{ grid-area:1/1; }
+.shot-mask{ width:256px; max-width:calc(100% - 28px); aspect-ratio:1; border-radius:7px; pointer-events:none;
+  background:radial-gradient(circle closest-side, transparent calc(92% - .5px), rgba(150,160,170,.5) 92%, rgba(118,128,138,.42) calc(92% + 1px)); }
+canvas[hidden] + .shot-mask{ display:none; }
 .shot-placeholder[hidden]{ display:none; }
 .shot-placeholder{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px; color:rgba(222,239,247,.7); text-align:center; font-size:12px; }
 .shot-placeholder span:first-child{ font-size:30px; color:rgba(91,205,245,.75); }
@@ -149,6 +153,14 @@ body.has-savebar .wrap{ padding-bottom:96px; }
 .ptitle{ display:flex; align-items:center; gap:12px; margin:0 2px 16px; }
 .ptitle h2{ font-family:var(--jost); font-weight:500; font-size:18px; letter-spacing:.04em; color:var(--ink); }
 .ptitle .rule{ flex:1; height:1px; background:var(--rule); }
+.panel.collapsible > .ptitle{ cursor:pointer; user-select:none; }
+.panel.collapsible > .ptitle::after{ content:""; width:7px; height:7px; flex:none; border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted); transform:rotate(45deg); margin-top:-4px; transition:transform .2s; }
+.panel.collapsible.collapsed > .ptitle{ margin-bottom:0; }
+.panel.collapsible.collapsed > .ptitle::after{ transform:rotate(-45deg); }
+.panel.collapsible > .ptitle:focus-visible{ outline:2px solid var(--cyan); outline-offset:4px; border-radius:4px; }
+.panel.collapsible.collapsed > :not(.ptitle){ display:none; }
+.danger-panel > .ptitle h2{ color:var(--proj-red); }
+.danger-panel > .adv-body{ padding:6px 2px 4px; }
 .subtitle{ font-family:var(--jost); font-weight:500; font-size:15px; letter-spacing:.03em; color:var(--ink);
   margin:18px 2px 12px; padding-top:14px; border-top:1px solid var(--hairline-soft); }
 .subtitle:first-child{ border-top:none; padding-top:0; margin-top:0; }

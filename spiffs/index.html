@@ -62,6 +62,7 @@
       <div class="shot-row" id="shotPanel">
         <div class="shot-frame">
           <canvas id="shotCanvas" width="128" height="128" role="img" data-i18n-aria-label="settings.screenshot.title" aria-label="Live screen capture" hidden></canvas>
+          <div class="shot-mask" aria-hidden="true"></div>
           <div class="shot-placeholder" id="shotPlaceholder"><span aria-hidden="true">▣</span><span data-i18n="settings.screenshot.placeholder">Capture the device screen to preview it here</span></div>
           <div class="shot-loading" id="shotLoading" hidden><span class="shot-spinner" aria-hidden="true"></span></div>
         </div>
@@ -89,7 +90,7 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="settings.connection.title">Connection</h2><span class="rule"></span></div>
       <div class="conn-grid">
         <div class="conn-fields">
@@ -144,7 +145,7 @@
       <p class="note left" data-i18n="settings.connection.restart_note">* Changing these connection settings will restart the device.</p>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="settings.display.title">Display</h2><span class="rule"></span></div>
       <div class="field"><label data-i18n="advanced.display.rotation">Display rotation</label>
         <select id="rotation"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select>
@@ -216,7 +217,7 @@
       </details>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="settings.regional.title">Regional</h2><span class="rule"></span></div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.regional.us_units">US units</div><div class="ts" data-i18n="settings.regional.us_units_desc">Fahrenheit, mph, inches</div></div><button class="gswitch" id="fahrenheit" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.regional.us_units" aria-label="US units"></button></div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.regional.hour12">12-hour clock</div><div class="ts" data-i18n="settings.regional.hour12_desc">Display time with AM / PM</div></div><button class="gswitch" id="hour12" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.regional.hour12" aria-label="12-hour clock"></button></div>
@@ -248,7 +249,7 @@
 
   <!-- ===================== INTEGRATIONS ===================== -->
   <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2><span class="dot off" id="dot-cgm"></span><span data-i18n="integrations.glucose_monitors.title">Glucose monitoring</span></h2><span class="rule"></span><span class="int-state" id="state-cgm"></span></div>
       <div class="field"><label data-i18n="integrations.glucose_monitors.device_type">Device Type</label>
         <select id="cgm_device_type">
@@ -287,7 +288,7 @@
         </div>
       </details>
     </div>
-      <div class="panel">
+      <div class="panel collapsible collapsed">
       <div class="ptitle"><h2><span class="dot off" id="dot-ha"></span><span data-i18n="integrations.ha.title">Home Assistant</span></h2><span class="rule"></span><span class="int-state" id="state-ha"></span></div>
       <div class="field"><label data-i18n="integrations.ha.server_url">Server URL</label>
         <input type="text" id="eeprom_ha_url" maxlength="200" data-i18n-placeholder="integrations.ha.server_url_placeholder" placeholder="e.g. http://homeassistant.local:8123">
@@ -305,7 +306,7 @@
       </details>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2><span class="dot off" id="dot-stock"></span><span data-i18n="integrations.stock.title">Stock quotes</span></h2><span class="rule"></span><span class="int-state" id="state-stock"></span></div>
       <p class="muted-p tight" data-i18n="integrations.stock.via">Via Finnhub.io.</p>
       <div class="field"><label data-i18n="integrations.stock.api_key">API key</label>
@@ -320,7 +321,7 @@
       </details>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2><span class="dot off" id="dot-wu"></span><span data-i18n="integrations.wu.title">Weather Underground</span></h2><span class="rule"></span><span class="int-state" id="state-wu"></span></div>
       <p class="muted-p tight" data-i18n="integrations.wu.help">Register a device on your Weather Underground account, generate a key at wunderground.com/member/api-keys, then enter any live public station ID. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].</p>
       <div class="field"><label data-i18n="integrations.wu.station_id">Station ID</label>
@@ -397,7 +398,7 @@
 
   <!-- ===================== SYSTEM (status + maintenance + danger zone) ===================== -->
   <section class="tab-page" id="tab-status" data-screen-label="System">
-    <div class="panel">
+    <div class="panel collapsible">
       <div class="ptitle"><h2 data-i18n="status.system.title">System information</h2><span class="rule"></span></div>
       <div class="info-grid">
         <div class="info"><div class="l" data-i18n="status.system.app_name">Application</div><div class="v" id="app">-</div></div>
@@ -415,7 +416,7 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="status.sensor.title">Sensor data</h2><span class="rule"></span></div>
       <div class="info-grid">
         <div class="info"><div class="l" data-i18n="status.sensor.light_level">Light level (lux)</div><div class="v" id="lux">-</div></div>
@@ -430,7 +431,7 @@
       <button class="btn sm ghost" id="refreshStatus" style="margin-top:14px" data-i18n="status.refresh_button">Refresh status</button>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="status.diagnostics_title">Diagnostics</h2><span class="rule"></span></div>
       <p class="muted-p" data-i18n="status.support.desc">Share device diagnostics with our team to help troubleshoot.</p>
       <div class="btn-row">
@@ -454,7 +455,7 @@
       </details>
     </div>
 
-    <div class="panel">
+    <div class="panel collapsible collapsed">
       <div class="ptitle"><h2 data-i18n="system.maintenance_title">Maintenance</h2><span class="rule"></span></div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.autoupdate.check">Check for firmware updates</div><div class="ts" data-i18n="settings.autoupdate.check_desc">Install new firmware automatically</div></div><button class="gswitch" id="update_firmware" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.autoupdate.check" aria-label="Auto update"></button></div>
       <p class="muted-p" data-i18n="update.refresh_description">Re-download and install the current firmware and files (SPIFFS).</p>
@@ -465,10 +466,9 @@
       <p class="muted-p" style="margin-top:10px" data-i18n="restart.description">Restart your Frixos device. It will be unavailable for a short moment while it reboots.</p>
     </div>
 
-    <div class="panel danger-panel">
-      <details class="adv-box danger-box">
-        <summary data-i18n="system.danger_title">Danger zone</summary>
-        <div class="adv-body">
+    <div class="panel collapsible collapsed danger-panel">
+      <div class="ptitle"><h2 data-i18n="system.danger_title">Danger zone</h2><span class="rule"></span></div>
+      <div class="adv-body">
           <div class="subtitle" data-i18n="update.title">Upload firmware / files</div>
           <p class="muted-p" data-i18n="update.upload_desc">Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.</p>
           <div class="field"><label data-i18n="common.file">File</label><input type="file" id="fwFile"></div>
@@ -508,8 +508,7 @@
             </table>
           </div>
           <p class="note left" id="filesSummary"></p>
-        </div>
-      </details>
+      </div>
     </div>
   </section>
 
@@ -568,5 +567,6 @@
 <script src="js/screenshot.js"></script>
 <script src="js/savebar.js"></script>
 <script src="js/screen-editor.js"></script>
+<script src="js/panels.js"></script>
 </body>
 </html>
