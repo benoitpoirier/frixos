@@ -11,6 +11,7 @@
 
 #include "frixos.h"
 #include "f-display.h"
+#include "f-screenshot.h"
 #include "f-pwm.h"
 #include "f-time.h"
 #include "f-wifi.h"
@@ -1184,6 +1185,11 @@ esp_err_t startup_lvgl(void)
       }};
   lvgl_disp = lvgl_port_add_disp(&disp_cfg);
   lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
+  if (lvgl_port_lock(0))
+  {
+    screenshot_attach(lvgl_disp);
+    lvgl_port_unlock();
+  }
 
   return ESP_OK;
 }

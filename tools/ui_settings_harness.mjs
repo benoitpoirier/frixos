@@ -359,7 +359,7 @@ vm.createContext(sandbox);
 
 const scripts = [
   'js/utils.js', 'js/core.js', 'js/forms.js', 'js/wifi.js', 'js/integrations.js',
-  'js/system.js', 'js/support.js', 'js/savebar.js', 'js/screen-editor.js',
+  'js/system.js', 'js/support.js', 'js/screenshot.js', 'js/savebar.js', 'js/screen-editor.js',
 ];
 let source = scripts.map(rel => fs.readFileSync(path.join(spiffs, rel), 'utf8')).join('\n;\n');
 

@@ -34,6 +34,22 @@
     "unsaved_changes": "You have unsaved changes"
   },
   "settings": {
+    "screenshot": {
+      "title": "Live screen",
+      "refresh": "Refresh capture",
+      "download": "Download PNG",
+      "show_on_load": "Capture when the page opens",
+      "auto_refresh": "Auto-refresh",
+      "auto_off": "Off",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Capturing…",
+      "updated": "Updated",
+      "error": "Capture failed",
+      "busy": "Device busy — try again in a moment",
+      "placeholder": "Tap refresh to capture the display"
+    },
     "connection": {
       "title": "Connection",
       "wifi_ssid": "WiFi SSID",

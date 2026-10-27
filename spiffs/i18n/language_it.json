@@ -34,6 +34,22 @@
     "unsaved_changes": "Modifiche non salvate"
   },
   "settings": {
+    "screenshot": {
+      "title": "Schermata live",
+      "refresh": "Aggiorna acquisizione",
+      "download": "Scarica PNG",
+      "show_on_load": "Acquisisci all’apertura della pagina",
+      "auto_refresh": "Aggiornamento automatico",
+      "auto_off": "Disattivato",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Acquisizione in corso…",
+      "updated": "Aggiornato",
+      "error": "Acquisizione non riuscita",
+      "busy": "Dispositivo occupato — riprova tra poco",
+      "placeholder": "Tocca Aggiorna per acquisire il display"
+    },
     "connection": {
       "title": "Connessione",
       "wifi_ssid": "SSID WiFi",

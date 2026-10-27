@@ -34,6 +34,22 @@
     "unsaved_changes": "Du har osparade ändringar"
   },
   "settings": {
+    "screenshot": {
+      "title": "Live-skärm",
+      "refresh": "Uppdatera bild",
+      "download": "Ladda ned PNG",
+      "show_on_load": "Ta bild när sidan öppnas",
+      "auto_refresh": "Automatisk uppdatering",
+      "auto_off": "Av",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Tar bild…",
+      "updated": "Uppdaterad",
+      "error": "Bildtagningen misslyckades",
+      "busy": "Enheten är upptagen — försök igen om en stund",
+      "placeholder": "Tryck på Uppdatera för att ta en bild av skärmen"
+    },
     "connection": {
       "title": "Anslutning",
       "wifi_ssid": "WiFi SSID",

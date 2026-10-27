@@ -34,6 +34,22 @@
     "unsaved_changes": "Du har ikke-gemte ændringer"
   },
   "settings": {
+    "screenshot": {
+      "title": "Live-skærm",
+      "refresh": "Opdater skærmbillede",
+      "download": "Download PNG",
+      "show_on_load": "Tag skærmbillede, når siden åbnes",
+      "auto_refresh": "Automatisk opdatering",
+      "auto_off": "Fra",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Optager…",
+      "updated": "Opdateret",
+      "error": "Kunne ikke tage skærmbillede",
+      "busy": "Enheden er optaget — prøv igen om et øjeblik",
+      "placeholder": "Tryk på Opdater for at tage et skærmbillede"
+    },
     "connection": {
       "title": "Forbindelse",
       "wifi_ssid": "WiFi SSID",

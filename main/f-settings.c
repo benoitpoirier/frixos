@@ -9,6 +9,7 @@
 #include "f-membuffer.h"
 #include "frixos.h"
 #include "f-display.h"
+#include "f-screenshot.h"
 #include "f-screen-layout-bin.h"
 #include "f-layout-migrate.h"
 #include "f-pwm.h"
@@ -3859,6 +3860,24 @@ static esp_err_t files_rename_wrapper(httpd_req_t *req)
     return http_mutex_wrapper(req, files_rename_handler);
 }
 
+// Screen capture: short mutex wait so a capture never queues behind a TLS fetch
+// (when the heap is at its lowest); the UI simply retries later on 503.
+#define HTTP_MUTEX_SCREENSHOT_WAIT_MS 1500
+static esp_err_t screenshot_wrapper(httpd_req_t *req)
+{
+    if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(HTTP_MUTEX_SCREENSHOT_WAIT_MS)) != pdTRUE)
+    {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_set_hdr(req, "Retry-After", "5");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"busy\"}");
+        return ESP_OK;
+    }
+    esp_err_t result = screenshot_http_handler(req);
+    xSemaphoreGive(http_mutex);
+    return result;
+}
+
 // Wrapper for generic file handler
 static esp_err_t generic_file_wrapper(httpd_req_t *req)
 {
@@ -4115,6 +4134,18 @@ esp_err_t start_webserver()
     if (ret != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register files rename handler");
+        return ret;
+    }
+
+    // Must be registered before the "/*" wildcard
+    uri_handler.uri = "/api/screenshot";
+    uri_handler.method = HTTP_GET;
+    uri_handler.handler = screenshot_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register screenshot handler");
         return ret;
     }
 

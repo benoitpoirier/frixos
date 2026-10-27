@@ -59,6 +59,34 @@
         <div class="st" id="heroStatus">Loading…</div>
       </div>
       <span class="jewel"><span class="g" id="heroDot"></span> <span id="heroOnline">…</span></span>
+      <div class="shot-row" id="shotPanel">
+        <div class="shot-frame">
+          <canvas id="shotCanvas" width="128" height="128" role="img" data-i18n-aria-label="settings.screenshot.title" aria-label="Live screen capture" hidden></canvas>
+          <div class="shot-placeholder" id="shotPlaceholder"><span aria-hidden="true">▣</span><span data-i18n="settings.screenshot.placeholder">Capture the device screen to preview it here</span></div>
+          <div class="shot-loading" id="shotLoading" hidden><span class="shot-spinner" aria-hidden="true"></span></div>
+        </div>
+        <div class="shot-controls">
+          <div class="mini-label" data-i18n="settings.screenshot.title">Live screen capture</div>
+          <div class="shot-actions">
+            <button class="btn sm" id="shotRefresh" type="button" data-i18n-aria-label="settings.screenshot.refresh" aria-label="Refresh capture"><span aria-hidden="true">↻</span><span data-i18n="settings.screenshot.refresh">Refresh capture</span></button>
+            <button class="btn sm ghost" id="shotDownload" type="button" data-i18n-aria-label="settings.screenshot.download" aria-label="Download PNG" disabled><span aria-hidden="true">⤓</span><span data-i18n="settings.screenshot.download">Download PNG</span></button>
+          </div>
+          <div class="toggle shot-toggle">
+            <div class="tx"><div class="tt" data-i18n="settings.screenshot.show_on_load">Capture when the page opens</div></div>
+            <button class="gswitch" id="shotOnLoad" type="button" role="switch" aria-checked="true" data-i18n-aria-label="settings.screenshot.show_on_load" aria-label="Capture when the page opens"></button>
+          </div>
+          <div class="shot-auto">
+            <span class="mini-label" data-i18n="settings.screenshot.auto_refresh">Auto-refresh</span>
+            <div class="seg shot-seg" role="group" data-i18n-aria-label="settings.screenshot.auto_refresh" aria-label="Auto-refresh">
+              <button class="seg-btn" type="button" data-value="0" data-i18n="settings.screenshot.auto_off" aria-pressed="true">Off</button>
+              <button class="seg-btn" type="button" data-value="10" data-i18n="settings.screenshot.auto_10s" aria-pressed="false">10 s</button>
+              <button class="seg-btn" type="button" data-value="30" data-i18n="settings.screenshot.auto_30s" aria-pressed="false">30 s</button>
+              <button class="seg-btn" type="button" data-value="60" data-i18n="settings.screenshot.auto_1m" aria-pressed="false">1 min</button>
+            </div>
+          </div>
+          <div class="shot-status" id="shotStatus" aria-live="polite"></div>
+        </div>
+      </div>
     </div>
 
     <div class="panel">
@@ -537,6 +565,7 @@
 <script src="js/integrations.js"></script>
 <script src="js/system.js"></script>
 <script src="js/support.js"></script>
+<script src="js/screenshot.js"></script>
 <script src="js/savebar.js"></script>
 <script src="js/screen-editor.js"></script>
 </body>

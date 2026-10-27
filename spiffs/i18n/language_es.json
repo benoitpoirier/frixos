@@ -34,6 +34,22 @@
     "unsaved_changes": "Tienes cambios sin guardar"
   },
   "settings": {
+    "screenshot": {
+      "title": "Pantalla en directo",
+      "refresh": "Actualizar captura",
+      "download": "Descargar PNG",
+      "show_on_load": "Capturar al abrir la página",
+      "auto_refresh": "Actualización automática",
+      "auto_off": "Desactivada",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Capturando…",
+      "updated": "Actualizado",
+      "error": "Error al capturar",
+      "busy": "Dispositivo ocupado — inténtalo de nuevo en un momento",
+      "placeholder": "Toca Actualizar para capturar la pantalla"
+    },
     "connection": {
       "title": "Conexión",
       "wifi_ssid": "SSID WiFi",

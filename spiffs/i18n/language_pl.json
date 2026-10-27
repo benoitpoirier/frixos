@@ -34,6 +34,22 @@
     "unsaved_changes": "Masz niezapisane zmiany"
   },
   "settings": {
+    "screenshot": {
+      "title": "Ekran na żywo",
+      "refresh": "Odśwież zrzut",
+      "download": "Pobierz PNG",
+      "show_on_load": "Zrób zrzut po otwarciu strony",
+      "auto_refresh": "Automatyczne odświeżanie",
+      "auto_off": "Wył.",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Trwa przechwytywanie…",
+      "updated": "Zaktualizowano",
+      "error": "Nie udało się przechwycić ekranu",
+      "busy": "Urządzenie jest zajęte — spróbuj ponownie za chwilę",
+      "placeholder": "Dotknij Odśwież, aby przechwycić ekran"
+    },
     "connection": {
       "title": "Połączenie",
       "wifi_ssid": "SSID WiFi",

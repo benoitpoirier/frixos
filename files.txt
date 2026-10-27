@@ -20,6 +20,7 @@ js/forms.js
 js/integrations.js
 js/savebar.js
 js/screen-editor.js
+js/screenshot.js
 js/support.js
 js/system.js
 js/utils.js

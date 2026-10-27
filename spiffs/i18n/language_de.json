@@ -34,6 +34,22 @@
     "unsaved_changes": "Nicht gespeicherte Änderungen vorhanden"
   },
   "settings": {
+    "screenshot": {
+      "title": "Live-Bildschirm",
+      "refresh": "Aufnahme aktualisieren",
+      "download": "PNG herunterladen",
+      "show_on_load": "Beim Öffnen der Seite erfassen",
+      "auto_refresh": "Automatische Aktualisierung",
+      "auto_off": "Aus",
+      "auto_10s": "10 s",
+      "auto_30s": "30 s",
+      "auto_1m": "1 min",
+      "capturing": "Wird erfasst…",
+      "updated": "Aktualisiert",
+      "error": "Aufnahme fehlgeschlagen",
+      "busy": "Gerät beschäftigt — bitte gleich erneut versuchen",
+      "placeholder": "Zum Erfassen des Displays auf Aktualisieren tippen"
+    },
     "connection": {
       "title": "Verbindung",
       "wifi_ssid": "WiFi SSID",

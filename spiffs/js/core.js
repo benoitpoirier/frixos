@@ -149,6 +149,7 @@ function refreshDynamicI18n() {
   if (typeof fillLayoutSelect === 'function' && el('settingsLayoutSelect')) {
     fillLayoutSelect('settingsLayoutSelect');
   }
+  if (typeof refreshScreenshotI18n === 'function') refreshScreenshotI18n();
 }
 
 /* ---------- i18n apply ---------- */
@@ -283,6 +284,7 @@ async function boot() {
   if (sectionLoaders.settings) await sectionLoaders.settings();
 
   await refreshHeroStatus();
+  if (typeof initScreenshot === 'function') initScreenshot();
   updateNavEdges();
 }
 document.addEventListener('DOMContentLoaded', boot);

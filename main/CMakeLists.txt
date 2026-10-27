@@ -14,6 +14,7 @@ idf_component_register(SRCS
     "f-screen-layout-bin.c"
     "f-wifi.c"
     "f-display.c"
+    "f-screenshot.c"
     "f-graph.c"
     "f-time.c"
     "f-pwm.c"
