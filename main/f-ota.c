@@ -31,17 +31,21 @@ static int64_t last_check_us = 0;
 
 // OTA update thread control
 TaskHandle_t ota_update_task_handle = NULL;
+#if !FRIXOS_DISABLE_AUTO_OTA
 static portMUX_TYPE ota_task_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool ota_thread_enabled = false;
 static bool ota_task_running = false;
 static bool ota_run_pending = false;
 static bool ota_reinstall_mode = false;
+#endif
 
 // Internal function declarations
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
                                const uint8_t *expected_sha256, uint32_t expected_size);
 static void update_progress(int progress, const char *message);
+#if !FRIXOS_DISABLE_AUTO_OTA
 static void ota_update_task(void *pvParameters);
+#endif
 static void log_partition_info(const esp_partition_t *partition, const char *prefix);
 static void ota_handle_failure(const char *error_msg, update_status_t status, bool release_mutex);
 static void ota_handle_failure_with_cleanup(const char *error_msg, update_status_t status, esp_http_client_handle_t client, esp_ota_handle_t ota_handle, bool release_mutex);
@@ -1197,8 +1201,7 @@ void f_ota_check_update(void)
     ESP_LOGI_STACK(TAG, "OTA Check Update");
 
 #if FRIXOS_DISABLE_AUTO_OTA
-    // Dev build flashed with idf.py: never replace it with a published release.
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Automatic OTA disabled in this build (DISABLE_AUTO_OTA=1)");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Firmware OTA disabled by DISABLE_AUTO_OTA=1");
     return;
 #endif
 
@@ -1497,6 +1500,11 @@ static void f_ota_do_update(int version)
 
 void f_ota_reinstall_current(void)
 {
+#if FRIXOS_DISABLE_AUTO_OTA
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Firmware reinstall blocked by DISABLE_AUTO_OTA=1");
+    return;
+#endif
+
     ESP_LOGI_STACK(TAG, "OTA Reinstall Current");
 
     if (!wifi_connected)
@@ -1516,6 +1524,7 @@ void f_ota_reinstall_current(void)
     f_ota_do_update(fwversion);
 }
 
+#if !FRIXOS_DISABLE_AUTO_OTA
 // Runs on demand and deletes itself: the 10 KB stack was idle >99% of the time.
 static void ota_update_task(void *pvParameters)
 {
@@ -1560,19 +1569,29 @@ static void ota_update_task(void *pvParameters)
         }
     }
 }
+#endif
 
 void f_ota_start_update_thread(void)
 {
+#if !FRIXOS_DISABLE_AUTO_OTA
     ota_thread_enabled = true;
+#endif
 }
 
 void f_ota_stop_update_thread(void)
 {
+#if !FRIXOS_DISABLE_AUTO_OTA
     ota_thread_enabled = false;
+#endif
 }
 
 static void ota_run(bool reinstall)
 {
+#if FRIXOS_DISABLE_AUTO_OTA
+    (void)reinstall;
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Firmware OTA request blocked by DISABLE_AUTO_OTA=1");
+    return;
+#else
     if (!ota_thread_enabled)
     {
         return;
@@ -1602,6 +1621,7 @@ static void ota_run(bool reinstall)
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     }
+#endif
 }
 
 void f_ota_trigger_update(void)

@@ -18,6 +18,7 @@
 >   - a subtle circle marks the area actually visible on the wall, the corners outside it are dimmed
 > - **Adaptive brightness and simplified dimming modes** in Device → Display: Full keeps brightness at 100%, Based on Brightness follows the ambient-light sensor and adaptive curve (four draggable lux/brightness points, a day/night threshold and 24-hour lux history), and Based on Time uses the Day/Night sliders during the configured day window. Controls are in the main Display panel without a separate Advanced disclosure; projection sliders appear only for time-based dimming.
 > - **Streamlined Device display settings**: font and layout selectors are centralized in the Layout tab instead of being duplicated in Device, and PWM frequency and maximum power are grouped under an LED settings heading.
+> - **Firmware OTA disabled by default**: automatic checks, firmware uploads, and reinstalls are blocked with `DISABLE_AUTO_OTA=1`; SPIFFS file uploads and boot validation for rollback safety remain available. Set the flag to `0` only for an OTA-enabled build.
 
 Frixos is an open-source firmware for the Frixos daylight projection clock—a WiFi-enabled device that projects time, weather, and biometric data onto any surface. Built on **ESP-IDF 6.0.1** for ESP32, it features a web-based provisioning portal, multilingual settings UI, and integrations with popular smart home and health platforms.
 

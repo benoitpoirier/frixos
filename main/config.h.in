@@ -6,6 +6,7 @@
 #define WEATHER_USER_AGENT "@WEATHER_USER_AGENT@"
 #define ARTLOGIC_SSID "@ARTLOGIC_SSID@"
 #define ARTLOGIC_PASSWORD "@ARTLOGIC_PASSWORD@"
+/* Disables firmware update paths; boot validation remains active for rollback safety. */
 #define FRIXOS_DISABLE_AUTO_OTA @DISABLE_AUTO_OTA@
 
 #endif

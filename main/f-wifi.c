@@ -299,6 +299,10 @@ void initialize_mdns(void)
 // OTA update timer callback
 void ota_update_timer_callback(void *arg)
 {
+#if FRIXOS_DISABLE_AUTO_OTA
+    (void)arg;
+    return;
+#else
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA Update Timer");
 
     // Trigger the OTA update thread
@@ -313,6 +317,7 @@ void ota_update_timer_callback(void *arg)
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to restart OTA update timer: %s", esp_err_to_name(err));
         }
     }
+#endif
 }
 
 // mDNS announcement timer callback
@@ -411,6 +416,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disconnected, retry %d", retry_count);
             wifi_connected = false;
 
+#if !FRIXOS_DISABLE_AUTO_OTA
             // Stop OTA update timer when disconnected. Keep the handle so
             // GOT_IP can reuse it - NULLing without delete leaked a timer
             // on every roam/flap.
@@ -418,6 +424,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             {
                 esp_timer_stop(ota_update_timer);
             }
+#endif
 
             shutdown_mdns_on_link_loss();
 
@@ -495,6 +502,8 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             if (wifi_task_handle != NULL)
                 xTaskNotify(wifi_task_handle, WIFI_NOTIFY_MDNS_INIT, eSetBits);
 
+            esp_err_t err;
+#if !FRIXOS_DISABLE_AUTO_OTA
             // Create and start OTA update timer if not already created
             if (ota_update_timer == NULL)
             {
@@ -509,7 +518,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             }
 
             // Start OTA update timer with initial delay
-            esp_err_t err = esp_timer_start_once(ota_update_timer, OTA_CHECK_DELAY_MS * 1000);
+            err = esp_timer_start_once(ota_update_timer, OTA_CHECK_DELAY_MS * 1000);
             if (err != ESP_OK)
             {
                 ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to start OTA update timer: %s", esp_err_to_name(err));
@@ -518,6 +527,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             {
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update timer started, first check in %d seconds", OTA_CHECK_DELAY_MS / 1000);
             }
+#endif
 
             // Create and start mDNS announcement timer if not already created
             if (mdns_announcement_timer == NULL)
@@ -668,8 +678,10 @@ void wifi_task(void *pvParameters)
 
     wifi_task_handle = xTaskGetCurrentTaskHandle();
 
+#if !FRIXOS_DISABLE_AUTO_OTA
     // Start the OTA update thread
     f_ota_start_update_thread();
+#endif
 
     // Register event handlers for WiFi events
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));

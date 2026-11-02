@@ -540,7 +540,7 @@
     "refresh_title": "Actualiser",
     "refresh_description": "Télécharge et réinstalle la version actuelle du firmware et des fichiers (SPIFFS).",
     "reinstall_button": "Réinstaller le firmware actuel",
-    "title": "Télécharger firmware / fichiers",
+    "title": "Téléverser des fichiers",
     "auto_check": "Votre appareil vérifie et installe automatiquement les nouveaux firmwares.",
     "manual_info": "Si notre support vous a demandé d'installer manuellement une version spécifique du firmware, ou si vous souhaitez télécharger une police personnalisée par exemple, vous pouvez le faire ici.",
     "select_file": "Sélectionnez un fichier firmware (.bin) ou un autre fichier à télécharger sur l'appareil.",

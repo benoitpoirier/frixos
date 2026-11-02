@@ -504,7 +504,7 @@
     "refresh_title": "Uppdatera",
     "refresh_description": "Detta laddar ner och installerar den aktuella versionen av firmware och filer (SPIFFS) igen.",
     "reinstall_button": "Installera om aktuell firmware",
-    "title": "Ladda upp firmware / filer",
+    "title": "Ladda upp filer",
     "auto_check": "Din enhet kontrollerar och installerar automatiskt ny firmware.",
     "manual_info": "Om vår support har instruerat dig att manuellt installera en specifik firmware-version, eller om du vill ladda upp ett anpassat typsnitt, kan du göra det här.",
     "select_file": "Välj en firmware-fil (.bin) eller annan fil att ladda upp till enheten.",

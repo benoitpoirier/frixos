@@ -6,6 +6,8 @@
 async function loadStatus() {
   const res = await apiGet('/api/status?logs=1');
   const d = res.data; if (!d) return;
+  const otaEnabled = d.ota_enabled !== false;
+  $$('[data-ota-only]').forEach(node => { node.hidden = !otaEnabled; });
   const txt = (id, v) => { const e = el(id); if (e) e.textContent = (v === undefined || v === null || v === '') ? '—' : v; };
   txt('lux', d.lux != null ? Number(d.lux).toFixed(1) : '—');
   txt('last_time_update', d.last_time_update ? ago(d.last_time_update) : '—');

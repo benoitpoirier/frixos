@@ -211,10 +211,14 @@ Build output is placed in `build/`. The relevant artefacts are:
 
 ## 6. Flashing the device
 
-### 6.1 Over-the-air (OTA) — recommended for updates
+### 6.1 Over-the-air (OTA)
+
+Firmware OTA is disabled by default in this fork (`DISABLE_AUTO_OTA=1`). This blocks automatic update checks, firmware uploads, and reinstall requests. SPIFFS file uploads remain available, and boot validation of an already-installed OTA image remains enabled for rollback safety.
+
+To intentionally enable firmware OTA, set `DISABLE_AUTO_OTA=0` in `.env`, then reconfigure and rebuild. After flashing that build:
 
 1. Open the device's web UI (`http://<hostname>.local` or its IP).
-2. Navigate to the **Update** tab.
+2. Navigate to the **System** tab.
 3. Upload `build/frixos.bin`.
 
 The device reboots into the new firmware automatically. The SPIFFS partition is **not** overwritten by OTA; update the web UI separately if needed (see [section 7](#7-deploying-the-web-ui-spiffs)).

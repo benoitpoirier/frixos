@@ -504,7 +504,7 @@
     "refresh_title": "Aggiorna",
     "refresh_description": "Scarica e reinstalla la versione attuale del firmware e dei file (SPIFFS).",
     "reinstall_button": "Reinstalla firmware attuale",
-    "title": "Carica firmware / file",
+    "title": "Carica file",
     "auto_check": "Il tuo dispositivo verifica e installa automaticamente nuovi firmware.",
     "manual_info": "Se il nostro supporto ti ha istruito di installare manualmente una versione specifica del firmware, o se desideri caricare un font personalizzato, puoi farlo qui.",
     "select_file": "Seleziona un file firmware (.bin) o altro file da caricare sul dispositivo.",

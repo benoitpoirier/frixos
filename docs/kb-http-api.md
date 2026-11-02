@@ -86,8 +86,8 @@ The text of the text widgets lives **only** in this blob. It is not an `/api/set
 | GET | `/api/status` | — | Device status JSON. `?light=1` returns cached lux/hour only; `?logs=1` adds logs; `?luxhist=1` adds hourly history |
 | GET | `/api/locate` | — | IP geolocation (`lat`, `lon`, `city`, `iana`, `posix`) |
 | GET | `/api/timezone` | — | `?location=Europe/Athens` or `?lat=&lon=` |
-| POST | `/api/ota` | firmware or SPIFFS file | Multipart or raw + `X-Filename` |
-| POST | `/api/ota/reinstall` | empty | Reinstall from stored firmware |
+| POST | `/api/ota` | Firmware or SPIFFS file | Multipart or raw + `X-Filename`; firmware is rejected when `DISABLE_AUTO_OTA=1`, while SPIFFS file uploads remain available |
+| POST | `/api/ota/reinstall` | empty | Reinstall from stored firmware; rejected when `DISABLE_AUTO_OTA=1` |
 | POST | `/api/reset` | empty | Reboot |
 | GET | `/api/wifi/scan` | — | Start scan |
 | GET | `/api/wifi/status` | — | Scan results |
@@ -553,7 +553,7 @@ curl.exe -s "$HOST/api/status"
 curl.exe -s "$HOST/api/status?logs=1"
 ```
 
-Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `local_hour`, `latitude`, `longitude`, `timezone`, `poh`. `lux` is the latest reading from the display's scheduled ALS sample; status polling does not trigger an extra I²C read. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM, Weather Underground). A fresh station observation looks like `Weather Underground: KCASANFR123, obs 4m, temp 22°C`. `stale` or `no observation` means the integration dot stays amber.
+Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ota_enabled`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `local_hour`, `latitude`, `longitude`, `timezone`, `poh`. `ota_enabled` is false when this build disables firmware update actions with `DISABLE_AUTO_OTA=1`. `lux` is the latest reading from the display's scheduled ALS sample; status polling does not trigger an extra I²C read. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM, Weather Underground). A fresh station observation looks like `Weather Underground: KCASANFR123, obs 4m, temp 22°C`. `stale` or `no observation` means the integration dot stays amber.
 
 `GET /api/status?light=1` is the compact polling response for the brightness editor: only cached `lux` and `local_hour`, with no cJSON tree or sensor read.
 

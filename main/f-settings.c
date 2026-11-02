@@ -17,6 +17,7 @@
 #include "f-wifi.h"
 #include "f-ota.h"
 #include "f-wu.h"
+#include "config.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2575,6 +2576,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "app", app);
     cJSON_AddStringToObject(root, "version", version);
     cJSON_AddNumberToObject(root, "fwversion", fwversion);
+    cJSON_AddBoolToObject(root, "ota_enabled", !FRIXOS_DISABLE_AUTO_OTA);
 
     cJSON_AddStringToObject(root, "revision", revision);
     cJSON_AddNumberToObject(root, "board_rev", eeprom_board_rev);
@@ -3028,6 +3030,20 @@ static void upload_ensure_parent_dirs(const char *path)
     }
 }
 
+#if FRIXOS_DISABLE_AUTO_OTA
+static esp_err_t send_ota_disabled_response(httpd_req_t *req)
+{
+    static const char response[] =
+        "{\"status\":\"error\",\"message\":\"Firmware OTA is disabled in this build\"}";
+    httpd_resp_set_status(req, "403 Forbidden");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t err = httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+    if (err != ESP_OK)
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to send OTA-disabled response: %s", esp_err_to_name(err));
+    return err;
+}
+#endif
+
 static esp_err_t upload_open_destination(upload_ctx_t *ctx, const uint8_t *first_payload, size_t first_payload_len)
 {
     if (*ctx->upload_destination_open)
@@ -3043,6 +3059,12 @@ static esp_err_t upload_open_destination(upload_ctx_t *ctx, const uint8_t *first
 
     if (*ctx->is_firmware)
     {
+#if FRIXOS_DISABLE_AUTO_OTA
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Firmware upload blocked by DISABLE_AUTO_OTA=1");
+        send_ota_disabled_response(ctx->req);
+        return ESP_FAIL;
+#endif
+
         *ctx->update_partition = esp_ota_get_next_update_partition(NULL);
         if (!*ctx->update_partition)
         {
@@ -3505,6 +3527,11 @@ esp_err_t ota_post_handler(httpd_req_t *req)
 // Handler for device reset
 esp_err_t ota_reinstall_post_handler(httpd_req_t *req)
 {
+#if FRIXOS_DISABLE_AUTO_OTA
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Firmware reinstall blocked by DISABLE_AUTO_OTA=1");
+    return send_ota_disabled_response(req);
+#endif
+
     if (!wifi_connected)
     {
         httpd_resp_set_type(req, "application/json");

@@ -504,7 +504,7 @@
     "refresh_title": "Aktualisieren",
     "refresh_description": "Lädt die aktuelle Version der Firmware und Dateien (SPIFFS) erneut herunter und installiert sie.",
     "reinstall_button": "Aktuelle Firmware neu installieren",
-    "title": "Firmware / Dateien hochladen",
+    "title": "Dateien hochladen",
     "auto_check": "Ihr Gerät überprüft und installiert neue Firmware automatisch.",
     "manual_info": "Falls Sie von unserem Support angewiesen wurden, eine bestimmte Firmware-Version manuell zu installieren, oder wenn Sie z.B. eine benutzerdefinierte Schriftart hochladen möchten, können Sie dies hier tun.",
     "select_file": "Wählen Sie eine Firmware-Datei (.bin) oder andere Datei zum Hochladen auf das Gerät.",

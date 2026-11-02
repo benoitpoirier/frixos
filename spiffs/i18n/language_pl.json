@@ -504,7 +504,7 @@
     "refresh_title": "Odśwież",
     "refresh_description": "Pobiera i instaluje ponownie bieżącą wersję oprogramowania układowego i plików (SPIFFS).",
     "reinstall_button": "Zainstaluj ponownie bieżące oprogramowanie",
-    "title": "Prześlij oprogramowanie / pliki",
+    "title": "Prześlij pliki",
     "auto_check": "Twoje urządzenie automatycznie sprawdza i instaluje nowe oprogramowanie układowe.",
     "manual_info": "Jeśli nasz support polecił Ci zainstalować określoną wersję oprogramowania ręcznie lub chcesz przesłać niestandardową czcionkę, możesz to zrobić tutaj.",
     "select_file": "Wybierz plik oprogramowania (.bin) lub inny plik do przesłania do urządzenia.",

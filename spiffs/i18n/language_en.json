@@ -551,7 +551,7 @@
     "reinstall_title": "Reinstall",
     "refresh_description": "Re-download and install the current firmware and files (SPIFFS).",
     "reinstall_button": "Reinstall current firmware",
-    "title": "Upload firmware / files",
+    "title": "Upload files",
     "upload_desc": "Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.",
     "auto_check": "Your device checks and installs new firmware automatically.",
     "manual_info": "If you have been instructed by our support to manually install a specific firmware version, or if you are looking to upload e.g. a custom font, you can do this here.",
