@@ -129,8 +129,15 @@ function collectSettingsPayload() {
 
 /* ---------- DEVICE: location / brightness (former Advanced tab) ---------- */
 const dimMode = el('dim_mode');
-function applyDim() { el('dimBright').hidden = dimMode.value !== '0'; el('dimTime').hidden = dimMode.value !== '2'; }
+function applyDim() {
+  const mode = dimMode.value;
+  el('dimBright').hidden = mode !== '0';
+  el('dimTime').hidden = mode !== '2';
+  el('dimFullHint').hidden = mode !== '1';
+  if (window.BrightnessCurve) window.BrightnessCurve.sync();
+}
 dimMode.addEventListener('change', applyDim);
+applyDim();
 
 async function loadAdvanced() {
   await loadGroup('group=advanced');
@@ -140,9 +147,19 @@ async function loadAdvanced() {
   if (s.p46 !== undefined) el('wifi_start').value = formatMinsToTimeString(s.p46);
   if (s.p47 !== undefined) el('wifi_end').value = formatMinsToTimeString(s.p47);
   if (s.p22 !== undefined) { el('dim_mode').value = String(s.p22); applyDim(); }
-  if (s.p21 !== undefined) setVal('lux_threshold', s.p21);
-  if (s.p20 !== undefined) setVal('lux_sensitivity', s.p20);
   if (Array.isArray(s.p23)) { setVal('brightness_LED0', s.p23[0]); setVal('brightness_LED1', s.p23[1]); }
+  if (window.BrightnessCurve) {
+    const brightnessCurve = window.BrightnessCurve;
+    if (!brightnessCurve.set(s.p67)) {
+      if (s.p67 !== undefined) console.warn('Invalid adaptive brightness curve; using defaults');
+      brightnessCurve.resetCurve();
+    }
+    if (!brightnessCurve.setThreshold(s.p21, s.p20)) {
+      if (s.p21 !== undefined || s.p20 !== undefined)
+        console.warn('Invalid day/night threshold; using defaults');
+      brightnessCurve.resetThreshold();
+    }
+  }
   refreshRangeVals();
   setVal('pwm_frequency', s.p42); setVal('max_power', s.p43);
   if (s.p55 !== undefined) el('dim_start').value = formatMinsToTimeString(s.p55);
@@ -150,7 +167,25 @@ async function loadAdvanced() {
   if (typeof applyDetectedHints === 'function') applyDetectedHints();
 }
 
+/* The device reports float32 lux values (e.g. 2.2000000476837158); compare at
+   the 0.1 lux resolution the editor uses so unchanged values are not re-sent. */
+function changedTenth(payload, key, newVal) {
+  const stored = S()[key];
+  if (stored === undefined) return;
+  if (Math.round(Number(stored) * 10) !== Math.round(newVal * 10)) payload[key] = newVal;
+}
+
 function collectAdvancedPayload() {
+  const brightnessCurve = window.BrightnessCurve;
+  if (!brightnessCurve) {
+    console.error('Adaptive brightness controls are unavailable');
+    return null;
+  }
+  // Only the adaptive mode exposes the curve; other modes must never be blocked by it.
+  if (dimMode.value === '0' && !brightnessCurve.isValid()) {
+    brightnessCurve.focusInvalid();
+    return null;
+  }
   const p = {};
   changed(p, 'p17', el('lat').value.trim());
   changed(p, 'p18', el('lon').value.trim());
@@ -160,10 +195,14 @@ function collectAdvancedPayload() {
   changed(p, 'p46', parseTimeStringToMins(el('wifi_start').value));
   changed(p, 'p47', parseTimeStringToMins(el('wifi_end').value));
   changed(p, 'p22', parseInt(dimMode.value, 10) || 0);
-  changed(p, 'p21', parseFloat(el('lux_threshold').value) || 0);
-  changed(p, 'p20', parseFloat(el('lux_sensitivity').value) || 0);
+  const thresholds = brightnessCurve.getThreshold();
+  changedTenth(p, 'p21', thresholds.threshold);
+  changedTenth(p, 'p20', thresholds.sensitivity);
   const ledNew = [parseInt(el('brightness_LED0').value, 10) || 0, parseInt(el('brightness_LED1').value, 10) || 0];
   if (S().p23 === undefined || JSON.stringify(S().p23) !== JSON.stringify(ledNew)) p.p23 = ledNew;
+  const curve = brightnessCurve.get();
+  if (S().p67 === undefined || JSON.stringify(S().p67) !== JSON.stringify(curve))
+    p.p67 = curve;
   changed(p, 'p42', parseInt(el('pwm_frequency').value, 10) || 0);
   changed(p, 'p43', parseInt(el('max_power').value, 10) || 0);
   changed(p, 'p55', parseTimeStringToMins(el('dim_start').value));

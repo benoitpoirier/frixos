@@ -45,6 +45,7 @@ Main task stack size
 #include "esp_check.h"
 #include "esp_littlefs.h"
 #include "nvs.h"
+#include "f-adaptive-core.h"
 
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
@@ -93,6 +94,7 @@ extern uint8_t eeprom_weather_theme[2]; // 0 = follow screen font; 1..12 = SCREE
 extern float eeprom_lux_sensitivity;
 extern float eeprom_lux_threshold;
 extern uint8_t eeprom_brightness_LED[2]; // in pct
+extern adaptive_curve_t eeprom_adapt_curve;
 #define DIM_MODE_BRIGHTNESS 0
 #define DIM_MODE_FULL 1
 #define DIM_MODE_TIME 2

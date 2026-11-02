@@ -13,6 +13,7 @@ uint8_t pwm_get_current_brightness(void);
 
 void startup_led_pwm();
 void set_led_pwm_brightness(uint8_t duty);
+void set_led_pwm_brightness_quiet(uint8_t duty);
 esp_err_t reconfigure_led_pwm_frequency(void);
 
 

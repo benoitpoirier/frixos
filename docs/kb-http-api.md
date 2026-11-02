@@ -83,7 +83,7 @@ The text of the text widgets lives **only** in this blob. It is not an `/api/set
 | POST | `/api/settings` | JSON | Partial update. `Content-Type: application/json` |
 | GET | `/api/screen` | — | **5634-byte** binary blob |
 | POST | `/api/screen` | binary, exactly 5634 bytes (or 1654 bytes: layout without the text widgets) | Persists and applies layout |
-| GET | `/api/status` | — | Device status JSON. `?logs=1` adds logs |
+| GET | `/api/status` | — | Device status JSON. `?light=1` returns cached lux/hour only; `?logs=1` adds logs; `?luxhist=1` adds hourly history |
 | GET | `/api/locate` | — | IP geolocation (`lat`, `lon`, `city`, `iana`, `posix`) |
 | GET | `/api/timezone` | — | `?location=Europe/Athens` or `?lat=&lon=` |
 | POST | `/api/ota` | firmware or SPIFFS file | Multipart or raw + `X-Filename` |
@@ -257,12 +257,13 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
-| `p23` | LED brightness **array** `[day, night]` | JSON array of 1–2 numbers, each **1–100** | `{"p23":[80,40]}` |
+| `p23` | LED brightness **array** `[day, night]`, used only when `p22=2` | JSON array of 1–2 numbers, each **1–100** | `{"p23":[80,40]}` |
 | `p20` | Lux sensitivity | float `0`–`50` | `{"p20":8.0}` |
 | `p21` | Lux threshold (day/night switch) | float `0`–`500` | `{"p21":20.0}` |
-| `p22` | Dim mode | `0`=brightness, `1`=full, `2`=time-of-day | `{"p22":0}` |
-| `p55` | Dim window start | minutes from midnight, `0`–`1439` | `{"p55":450}` |
-| `p56` | Dim window end | minutes from midnight, `0`–`1439` | `{"p56":1365}` |
+| `p22` | Dim mode | `0`=ambient brightness, `1`=full (100% of configured max power `p43`), `2`=time-of-day | `{"p22":0}` |
+| `p67` | Adaptive curve: four `[lux, brightness%]` pairs, flattened | JSON array of exactly 8 numbers; lux `0.1`–`6553.0`, at least `0.1` decade apart and increasing; brightness `1`–`100` integer | `{"p67":[0.5,30,5,45,50,75,500,100]}` |
+| `p55` | Day window start | minutes from midnight, `0`–`1439` | `{"p55":450}` |
+| `p56` | Day window end | minutes from midnight, `0`–`1439` | `{"p56":1365}` |
 | `p42` | PWM frequency Hz | `60`–`50000`. Applied immediately; failed reconfigure rolls back | `{"p42":250}` |
 | `p43` | Max power | `1`–`1023` (runtime may cap by board rev) | `{"p43":900}` |
 
@@ -270,6 +271,14 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 ```powershell
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p23":[80,40]}'
+```
+
+In dim mode `p22=0`, the ambient light sensor and `p67` curve control projection brightness; `p20`/`p21` still control the day/night screen-profile switch, and sensitivity cannot exceed the threshold. In mode `p22=1`, brightness stays at 100% of the configured maximum power (`p43`) and `p23` is ignored. In mode `p22=2`, `p23[0]` is used during the day window `p55`–`p56`, and `p23[1]` outside it.
+
+Factory defaults for adaptive brightness are `p20=0.5`, `p21=2`, and `p67=[1.2,2,3.2,44,31,55,130,76]`. At boot, a missing or invalid curve, or a missing or inconsistent `p20`/`p21` pair (out of range, or sensitivity above the threshold), is replaced by these defaults and saved. Older settings are not converted.
+
+```powershell
+curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p67":[0.5,30,5,45,50,75,500,100],"p21":20,"p20":6}'
 ```
 
 `p55`/`p56` are minutes from midnight (`0`–`1439`), same as `p46`/`p47`. `450` is 07:30.
@@ -544,7 +553,11 @@ curl.exe -s "$HOST/api/status"
 curl.exe -s "$HOST/api/status?logs=1"
 ```
 
-Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `latitude`, `longitude`, `timezone`, `poh`. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM, Weather Underground). A fresh station observation looks like `Weather Underground: KCASANFR123, obs 4m, temp 22°C`. `stale` or `no observation` means the integration dot stays amber.
+Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `local_hour`, `latitude`, `longitude`, `timezone`, `poh`. `lux` is the latest reading from the display's scheduled ALS sample; status polling does not trigger an extra I²C read. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM, Weather Underground). A fresh station observation looks like `Weather Underground: KCASANFR123, obs 4m, temp 22°C`. `stale` or `no observation` means the integration dot stays amber.
+
+`GET /api/status?light=1` is the compact polling response for the brightness editor: only cached `lux` and `local_hour`, with no cJSON tree or sensor read.
+
+`GET /api/status?luxhist=1` adds a `luxhist` object without registering another URI. It contains `h` (device local hour, `-1` if time is invalid) and `t`/`y` arrays of exactly 24 values for today and yesterday. Non-negative values are lux × 10; `-1` means no hourly reading yet. The current hour is shown as a running mean. The two-day ring is held in RTC memory, survives software restarts, resets after power-on/brownout, and does not generate periodic NVS writes.
 
 ### Locate / timezone
 

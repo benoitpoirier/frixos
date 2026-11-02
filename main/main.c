@@ -25,6 +25,7 @@
 #include "f-display.h"
 #include "f-wifi.h"
 #include "f-pwm.h"
+#include "f-adaptive.h"
 #include "f-ota.h"
 #include "f-provisioning.h"
 #include "f-integrations.h"
@@ -108,8 +109,8 @@ char eeprom_iana_tz[64] = "";                                      // human-read
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
 char eeprom_aux_font[2][12] = {"bold", "light"};                    // [0] = day aux digit font, [1] = night aux
 uint8_t eeprom_weather_theme[2] = {0, 0};                            // 0 follows eeprom_font; 1..12 selects a weather theme
-float eeprom_lux_sensitivity = 6.0;
-float eeprom_lux_threshold = 16.0;
+float eeprom_lux_sensitivity = ADAPT_DEFAULT_SENSITIVITY_LUX;
+float eeprom_lux_threshold = ADAPT_DEFAULT_THRESHOLD_LUX;
 uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
 uint8_t eeprom_dim_mode = DIM_MODE_BRIGHTNESS;
 uint8_t eeprom_fahrenheit = 1;
@@ -165,6 +166,7 @@ static const nvs_setting_t settings_table[] = {
     {"scroll_delay", SETTING_TYPE_U8, &eeprom_scroll_delay, 0},
     {"language", SETTING_TYPE_U8, &eeprom_language, 0},
     {"brightness", SETTING_TYPE_BLOB, eeprom_brightness_LED, sizeof(eeprom_brightness_LED)},
+    {"adapt_curve", SETTING_TYPE_BLOB, &eeprom_adapt_curve, sizeof(eeprom_adapt_curve)},
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
     {"lux_thresh", SETTING_TYPE_BLOB, &eeprom_lux_threshold, sizeof(eeprom_lux_threshold)},
     {"message", SETTING_TYPE_STR, eeprom_message, sizeof(eeprom_message)},
@@ -242,6 +244,37 @@ static esp_err_t nvs_write_setting(nvs_handle_t handle, const nvs_setting_t *set
     break;
   }
   return err;
+}
+
+static void persist_adaptive_defaults(bool curve_reset, bool threshold_reset)
+{
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &handle);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Could not open NVS to save brightness defaults: %s",
+                esp_err_to_name(err));
+    return;
+  }
+
+  if (curve_reset)
+    err = nvs_set_blob(handle, "adapt_curve", &eeprom_adapt_curve,
+                       sizeof(eeprom_adapt_curve));
+  if (err == ESP_OK && threshold_reset)
+    err = nvs_set_blob(handle, "lux_thresh", &eeprom_lux_threshold,
+                       sizeof(eeprom_lux_threshold));
+  if (err == ESP_OK && threshold_reset)
+    err = nvs_set_blob(handle, "lux_sens", &eeprom_lux_sensitivity,
+                       sizeof(eeprom_lux_sensitivity));
+  if (err == ESP_OK)
+    err = nvs_commit(handle);
+  nvs_close(handle);
+
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Could not save brightness defaults: %s",
+                esp_err_to_name(err));
+  else
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Saved default adaptive brightness settings");
 }
 
 // Add Home Assistant integration parameters
@@ -695,6 +728,7 @@ void startup_read_eeprom(void)
 
   nvs_handle_t nvs_handle;
   err = nvs_open(EEPROM_NAMESPACE, NVS_READONLY, &nvs_handle);
+  const bool nvs_opened = err == ESP_OK;
 
   if (err != ESP_OK)
   {
@@ -756,6 +790,9 @@ void startup_read_eeprom(void)
       strcpy(my_lon, eeprom_lon);
       strcpy(my_timezone, eeprom_timezone);
 
+      if (!adaptive_curve_valid(&eeprom_adapt_curve))
+        adaptive_curve_factory_default();
+      adaptive_init();
       nvs_close(nvs_handle);
       rescue_erase_nvs();
       return;
@@ -797,7 +834,7 @@ void startup_read_eeprom(void)
                 "  Layout:      offset=(%u,%u), rot=%u, mirror=%u, grid=%u\n"
                 "  Message txt: %s\n"
                 "  UI:          update=%u, dark=%u, lang=%u, scroll_dly=%u\n"
-                "  Brightness:  led=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f\n"
+                "  Brightness:  led=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f, curve=[%.1f:%u,%.1f:%u,%.1f:%u,%.1f:%u]\n"
                 "  HomeAssist:  url=%s, ha_refresh=%u (token redacted)\n"
                 "  Stock:       stock_refresh=%u (key redacted)\n"
                 "  Dexcom:      region=%u, refresh=%u, high=%u, low=%u\n"
@@ -817,6 +854,10 @@ void startup_read_eeprom(void)
                 eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay,
                 eeprom_brightness_LED[0], eeprom_brightness_LED[1],
                 eeprom_lux_sensitivity, eeprom_lux_threshold,
+                eeprom_adapt_curve.lux_x10[0] / 10.0f, (unsigned)eeprom_adapt_curve.pct[0],
+                eeprom_adapt_curve.lux_x10[1] / 10.0f, (unsigned)eeprom_adapt_curve.pct[1],
+                eeprom_adapt_curve.lux_x10[2] / 10.0f, (unsigned)eeprom_adapt_curve.pct[2],
+                eeprom_adapt_curve.lux_x10[3] / 10.0f, (unsigned)eeprom_adapt_curve.pct[3],
                 eeprom_ha_url, eeprom_ha_refresh_mins,
                 eeprom_stock_refresh_mins,
                 eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
@@ -824,6 +865,26 @@ void startup_read_eeprom(void)
                 eeprom_glucose_username, glucose_validity_duration, eeprom_glucose_unit,
                 (unsigned)eeprom_pwm_frequency, eeprom_max_power, eeprom_board_rev, (unsigned)eeprom_poh);
   }
+
+  const bool curve_reset = !adaptive_curve_valid(&eeprom_adapt_curve);
+  if (curve_reset)
+    adaptive_curve_factory_default();
+
+  const bool threshold_reset =
+      !adaptive_threshold_valid(eeprom_lux_threshold, eeprom_lux_sensitivity);
+  if (threshold_reset)
+  {
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG,
+                "Invalid day/night threshold %.1f/%.1f lux; restored defaults",
+                eeprom_lux_threshold, eeprom_lux_sensitivity);
+    eeprom_lux_threshold = ADAPT_DEFAULT_THRESHOLD_LUX;
+    eeprom_lux_sensitivity = ADAPT_DEFAULT_SENSITIVITY_LUX;
+  }
+
+  if ((curve_reset || threshold_reset) && nvs_opened &&
+      rescuemode != 1 && !rescue_mode_this_boot)
+    persist_adaptive_defaults(curve_reset, threshold_reset);
+  adaptive_init();
 
 } // end startup_read_eeprom
 

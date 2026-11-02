@@ -117,27 +117,41 @@ def wait_online(client: DeviceClient, timeout: int = 90) -> bool:
 
 
 def test_applied_brightness(client: DeviceClient, results: list[str]) -> None:
-    """Saved day/night percents must be what the LED is actually running.
-
-    Catches the boot bug where PWM starts at 100% and the display loop never
-    reapplies p23 unless font_index changes.
-    """
+    """Check that the active dimming mode determines the applied LED level."""
     settings = client.get_settings()
     status = client.get_status()
+    mode = settings.get("p22")
     p23 = settings.get("p23")
     current = status.get("current_brightness")
-    if not isinstance(p23, list) or len(p23) < 1:
-        results.append("FAIL brightness: missing p23")
-        return
-    allowed = {int(p23[0])}
-    if len(p23) > 1:
-        allowed.add(int(p23[1]))
     if current is None:
         results.append("FAIL brightness: current_brightness missing")
-    elif int(current) in allowed:
-        results.append(f"PASS brightness: current={current} in {sorted(allowed)}")
+        return
+    try:
+        mode = int(mode)
+        current = int(current)
+    except (TypeError, ValueError):
+        results.append("FAIL brightness: dim mode or current level is invalid")
+        return
+
+    if mode == 1:
+        if current == 100:
+            results.append("PASS brightness: full mode is at 100%")
+        else:
+            results.append(f"FAIL brightness: full mode is at {current}%, expected 100%")
+    elif mode == 2:
+        if not isinstance(p23, list) or not p23:
+            results.append("FAIL brightness: time mode is missing p23")
+        elif current in {int(percent) for percent in p23}:
+            results.append(f"PASS brightness: time mode current={current} in {p23}")
+        else:
+            results.append(f"FAIL brightness: time mode current={current} not in {p23}")
+    elif mode == 0:
+        if 1 <= current <= 100:
+            results.append(f"PASS brightness: adaptive mode current={current}% is in range")
+        else:
+            results.append(f"FAIL brightness: adaptive mode current={current}% is out of range")
     else:
-        results.append(f"FAIL brightness: current={current} not in saved {sorted(allowed)}")
+        results.append(f"FAIL brightness: unsupported dim mode {mode}")
 
 
 def test_group_masks(client: DeviceClient, results: list[str]) -> None:

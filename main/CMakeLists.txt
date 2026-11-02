@@ -18,6 +18,8 @@ idf_component_register(SRCS
     "f-graph.c"
     "f-time.c"
     "f-pwm.c"
+    "f-adaptive.c"
+    "f-adaptive-core.c"
     "ltr303.c"  
     "moon.c"
     "f-integrations.c"
@@ -88,4 +90,3 @@ add_custom_target(frixos_build_time ALL
     VERBATIM)
 add_dependencies(${COMPONENT_LIB} frixos_build_time)
 target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-

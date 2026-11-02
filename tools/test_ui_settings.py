@@ -16,11 +16,19 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SETTINGS_C = ROOT / "main" / "f-settings.c"
 PWM_H = ROOT / "main" / "include" / "f-pwm.h"
+ADAPTIVE_CORE_C = ROOT / "main" / "f-adaptive-core.c"
+ADAPTIVE_RUNTIME_C = ROOT / "main" / "f-adaptive.c"
+ADAPTIVE_TEST_C = ROOT / "tools" / "test_adaptive.c"
+MAIN_C = ROOT / "main" / "main.c"
+DISPLAY_C = ROOT / "main" / "f-display.c"
+PWM_C = ROOT / "main" / "f-pwm.c"
+CURVE_JS = ROOT / "spiffs" / "js" / "brightness-curve.js"
 
 # What the harness types into the form, and what /api/settings must receive.
 EXPECTED_SAVE = {
@@ -45,6 +53,7 @@ EXPECTED_SAVE = {
     "p21": 20.5,
     "p20": 8.5,
     "p23": [60, 15],
+    "p67": [0.5, 20, 5, 40, 50, 70, 500, 90],
     "p42": 250,
     "p43": 900,
     "p55": 7 * 60 + 30,  # 07:30 brightness-time start, not hour 7
@@ -181,9 +190,23 @@ def check_ui(observed: dict, failures: list[str]) -> None:
         try:
             translations = json.loads((ROOT / "spiffs" / "i18n" / f"language_{locale}.json").read_text(encoding="utf-8"))
             message = translations["advanced"]["message"]
+            brightness = translations["advanced"]["brightness"]
+            curve = brightness["curve"]
         except (OSError, KeyError, json.JSONDecodeError) as exc:
             fail("%s translations could not be checked: %s" % (locale, exc), failures)
             continue
+        for key in ("dim_mode_full_hint", "dim_start", "dim_end"):
+            if not isinstance(brightness.get(key), str) or not brightness[key]:
+                fail("%s brightness translation missing %s" % (locale, key), failures)
+        curve_keys = set(re.findall(r"\btr\('([a-z_]+)'", CURVE_JS.read_text(encoding="utf-8")))
+        if not curve_keys:
+            fail("could not find the adaptive curve translation keys in the editor", failures)
+        missing_curve_keys = sorted(
+            key for key in curve_keys if not isinstance(curve.get(key), str) or not curve[key]
+        )
+        if missing_curve_keys:
+            fail("%s adaptive curve translations missing %s" %
+                 (locale, ", ".join(missing_curve_keys)), failures)
         if "(+3 @ 12:01)" in message.get("token_cgm_glucose", ""):
             fail("%s CGM glucose help still advertises a trend/time suffix" % locale, failures)
         width_label = find_translation(translations, "text_width") or ""
@@ -357,6 +380,13 @@ def apply_upper_bounds(text: str, defined: dict[str, int]) -> dict[str, int]:
 
 def check_firmware(failures: list[str]) -> None:
     text = SETTINGS_C.read_text(encoding="utf-8")
+    main_text = MAIN_C.read_text(encoding="utf-8")
+    adaptive_text = ADAPTIVE_RUNTIME_C.read_text(encoding="utf-8")
+    display_text = DISPLAY_C.read_text(encoding="utf-8")
+    index_text = (ROOT / "spiffs" / "index.html").read_text(encoding="utf-8")
+    curve_js = CURVE_JS.read_text(encoding="utf-8")
+    forms_js = (ROOT / "spiffs" / "js" / "forms.js").read_text(encoding="utf-8")
+    components_css = (ROOT / "spiffs" / "css" / "components.css").read_text(encoding="utf-8")
     defined = macros()
     ranges = validation_ranges(text, defined)
     bounds = apply_upper_bounds(text, defined)
@@ -385,6 +415,180 @@ def check_firmware(failures: list[str]) -> None:
             if not lo <= float(value) <= hi:
                 fail("%s UI value %s outside validation %s-%s" % (key, value, lo, hi), failures)
 
+    curve_validation = slice_between(text, 'if (cJSON_HasObjectItem(root, "p67"))',
+                                     '/* p20 lux_sensitivity */')
+    for token in (
+        "ADAPT_CURVE_POINTS * 2",
+        "ADAPT_CURVE_MIN_LUX_X10",
+        "ADAPT_CURVE_MAX_LUX_X10",
+        "ADAPT_CURVE_MIN_LEVEL",
+        "ADAPT_CURVE_MAX_LEVEL",
+        "ADAPT_CURVE_MIN_GAP_NUMERATOR",
+        "ADAPT_CURVE_MIN_GAP_DENOMINATOR",
+    ):
+        if token not in curve_validation:
+            fail("p67 validation is missing %s" % token, failures)
+    if "extended_settings_mask" not in text or 'strcmp(group, "advanced")' not in text:
+        fail("p67 is not included in the extended advanced-settings mask", failures)
+    if 'cJSON_AddItemToObject(root, "p67", curve_array)' not in text:
+        fail("p67 is not returned by the settings API", failures)
+    post_text = slice_between(text, "esp_err_t settings_post_handler", "esp_err_t status_api_handler")
+    if "adaptive_curve_set(&curve)" not in post_text:
+        fail("p67 is not applied by the settings POST handler", failures)
+    if '{"adapt_curve", SETTING_TYPE_BLOB' not in main_text:
+        fail("adaptive curve is not persisted as an NVS blob", failures)
+    adaptive_core_h = (ROOT / "main" / "include" / "f-adaptive-core.h").read_text(encoding="utf-8")
+    if "persist_adaptive_defaults" not in main_text or \
+       "adaptive_curve_factory_default();" not in main_text or \
+       "adaptive_threshold_valid(eeprom_lux_threshold, eeprom_lux_sensitivity)" not in main_text:
+        fail("missing or invalid brightness settings do not fall back to stored defaults", failures)
+    if "default_from_legacy" in main_text + adaptive_text or "setLegacy" in curve_js + forms_js:
+        fail("legacy brightness settings are still converted instead of using defaults", failures)
+    if "ADAPT_DEFAULT_THRESHOLD_LUX 2.0f" not in adaptive_core_h or \
+       "ADAPT_DEFAULT_SENSITIVITY_LUX 0.5f" not in adaptive_core_h:
+        fail("firmware default day threshold and sensitivity do not match the brightness editor", failures)
+    for default in (
+        "{ lux: 1.2, pct: 2 }",
+        "{ lux: 3.2, pct: 44 }",
+        "{ lux: 31, pct: 55 }",
+        "{ lux: 130, pct: 76 }",
+    ):
+        if default not in curve_js:
+            fail("brightness editor defaults are missing %s" % default, failures)
+    if "const DEFAULT_THRESHOLD = 2;" not in curve_js or \
+       "const DEFAULT_SENSITIVITY = 0.5;" not in curve_js:
+        fail("curve threshold defaults do not match the brightness editor", failures)
+    if 'id="lux_threshold"' in index_text or 'id="lux_sensitivity"' in index_text or \
+       'class="bc-daynight"' in index_text:
+        fail("Day/night switch fields are still rendered next to the adaptive curve", failures)
+    if "getThreshold: () =>" not in curve_js or \
+       "changedTenth(p, 'p21', thresholds.threshold)" not in forms_js or \
+       "changedTenth(p, 'p20', thresholds.sensitivity)" not in forms_js:
+        fail("graph day/night handles are not wired to the settings payload", failures)
+    if "dimMode.value === '0' && !brightnessCurve.isValid()" not in forms_js:
+        fail("curve validation can block saving in non-adaptive dimming modes", failures)
+    if 'id="bcChips"' in index_text or re.search(r'id="bc(?:Lux|Pct)\d"', index_text):
+        fail("manual point-value fields are still rendered next to the adaptive curve", failures)
+    if "bcLux" in curve_js or "bcPct" in curve_js or ".bc-chip" in components_css:
+        fail("curve code or styles still depend on removed point-value fields", failures)
+    if "or enter exact values" in index_text:
+        fail("curve guidance still refers to removed point-value fields", failures)
+    if "pointRefs[i].group.addEventListener('keydown'" not in curve_js or \
+       "chart.addEventListener('pointerdown', pointerDown)" not in curve_js:
+        fail("adaptive reference points are not editable by keyboard and pointer on the curve", failures)
+    if "const HISTORY_HEIGHT = 192;" not in curve_js or ".bc-hist{ height:192px; }" not in components_css:
+        fail("24-hour brightness history is not three times its original height", failures)
+    if "historyCurveSegments" not in curve_js or "bc-history-curve-today" not in curve_js:
+        fail("24-hour brightness history is not rendered as a smooth curve", failures)
+    if "bc-bar-" in curve_js or "bc-point-label" in curve_js or "bc-value-pill-group" in curve_js:
+        fail("brightness history still uses bars or the curve displays point values", failures)
+    brightness_target = slice_between(
+        adaptive_text,
+        "uint8_t brightness_target_percent(void)",
+        "void adaptive_tick(float lux)",
+    )
+    if "if (manufacturer_mode || eeprom_dim_mode == DIM_MODE_FULL)\n        return ADAPT_CURVE_MAX_LEVEL;" not in brightness_target:
+        fail("full brightness mode does not target 100 percent", failures)
+    if "return time_brightness_percent(font_index);" not in brightness_target:
+        fail("time mode does not use the day/night brightness sliders", failures)
+    if "eeprom_brightness_LED" in brightness_target or "return curve.pct[0];" not in brightness_target:
+        fail("adaptive mode does not use only the curve as its target", failures)
+    if "if (!has_applied)" not in adaptive_text or "s_applied_brightness = target;" not in adaptive_text:
+        fail("adaptive brightness does not apply its first sensor target immediately", failures)
+    time_brightness = slice_between(
+        display_text,
+        "static bool is_time_of_day_bright(void)",
+        "static void handle_als_and_brightness(uint32_t loop_counter)",
+    )
+    if "if (!time_valid)" not in time_brightness:
+        fail("time-of-day dimming does not guard invalid time", failures)
+    if "if (!time_valid || !isfinite(lux))" not in adaptive_text:
+        fail("hourly ambient-light history does not guard invalid time", failures)
+    if "adaptive_tick(sensor_lux)" not in display_text:
+        fail("display ALS loop does not feed adaptive brightness/history", failures)
+    if "if (!adaptive_mode_active)" not in display_text or "set_led_pwm_brightness(brightness_target_percent())" not in display_text:
+        fail("legacy time/full brightness modes do not reapply their target on profile changes", failures)
+    if "return brightness_target_percent();" not in PWM_C.read_text(encoding="utf-8"):
+        fail("PWM startup does not use the unified brightness target", failures)
+    display_title = index_text.find('data-i18n="settings.display.title"')
+    regional_title = index_text.find('data-i18n="settings.regional.title"', display_title)
+    if display_title < 0 or regional_title < 0:
+        fail("display settings panel could not be located in the UI", failures)
+    else:
+        display_markup = index_text[display_title:regional_title]
+        if 'data-i18n="common.advanced"' in display_markup:
+            fail("display brightness controls are still inside an Advanced section", failures)
+    mode_position = index_text.find('id="dim_mode"')
+    if mode_position < 0:
+        fail("brightness mode selector is missing from the UI", failures)
+    elif index_text.rfind("<details", 0, mode_position) > index_text.rfind("</details>", 0, mode_position):
+        fail("brightness mode selector is still inside a details section", failures)
+    try:
+        dim_time_markup = slice_between(
+            index_text,
+            '<div id="dimTime"',
+            '\n      </div>\n\n      <div class="grid2">\n        <div class="field"><label data-i18n="advanced.brightness.pwm_frequency"',
+        )
+    except RuntimeError as exc:
+        fail("time dimming panel could not be located: %s" % exc, failures)
+    else:
+        if 'id="brightness_LED0"' not in dim_time_markup:
+            fail("projection brightness sliders are not inside time dimming", failures)
+    status_text = slice_between(text, "esp_err_t status_api_handler", "#define FILE_PATH")
+    if '"luxhist"' not in status_text or "cJSON_CreateRaw(history_json)" not in status_text:
+        fail("status API does not expose optional raw hourly history JSON", failures)
+    if "display_get_cached_lux()" not in status_text or "ltr303_get_frixos_lux()" in status_text:
+        fail("status API should return cached lux without extra I2C sensor reads", failures)
+    if "include_light_sample" not in status_text or "display_get_cached_lux()" not in status_text:
+        fail("status API does not provide the compact cached-light polling path", failures)
+    if "apiGet('/api/status?light=1')" not in CURVE_JS.read_text(encoding="utf-8"):
+        fail("brightness UI does not use the low-cost cached-light status query", failures)
+
+
+def check_adaptive_core(failures: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="frixos-adaptive-test-") as temp_dir:
+        executable = Path(temp_dir) / "test_adaptive"
+        command = [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-I",
+            str(ROOT / "main" / "include"),
+            str(ADAPTIVE_CORE_C),
+            str(ADAPTIVE_TEST_C),
+            "-lm",
+            "-o",
+            str(executable),
+        ]
+        try:
+            compile_result = subprocess.run(
+                command,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            fail("adaptive core host compile failed: %s" % exc, failures)
+            return
+        if compile_result.returncode != 0:
+            fail("adaptive core host compile failed\n%s" %
+                 (compile_result.stderr or compile_result.stdout), failures)
+            return
+        run_result = subprocess.run(
+            [str(executable)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if run_result.returncode != 0:
+            fail("adaptive core host tests failed\n%s" %
+                 (run_result.stderr or run_result.stdout), failures)
 
 def main() -> int:
     failures: list[str] = []
@@ -395,6 +599,7 @@ def main() -> int:
         check_firmware(failures)
     except Exception as exc:
         fail("firmware contract: %s" % exc, failures)
+    check_adaptive_core(failures)
 
     if failures:
         print("FAIL %d" % len(failures))

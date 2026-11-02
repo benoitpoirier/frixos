@@ -26,20 +26,29 @@ def run() -> int:
             print(f"PASS message loaded ({len(val)} chars)")
 
         # Tab navigation
-        for tab in ("advanced", "integrations", "status", "settings"):
+        for tab in ("integrations", "status", "settings"):
             page.click(f'#nav a[data-tab="{tab}"]')
             page.wait_for_timeout(400)
             if not page.locator(f"#tab-{tab}").evaluate("el => el.classList.contains('active')"):
                 failures.append(f"Tab {tab} did not activate")
 
-        # Advanced dim mode panels
-        page.click('#nav a[data-tab="advanced"]')
-        page.select_option("#dim_mode", "0")
-        if not page.locator("#dimBright").is_visible():
-            failures.append("Brightness dim panel hidden for mode 0")
-        page.select_option("#dim_mode", "2")
-        if not page.locator("#dimTime").is_visible():
-            failures.append("Time dim panel hidden for mode 2")
+        # Display brightness mode panels
+        page.click('#nav a[data-tab="settings"]')
+        display_panel = page.locator("#tab-settings .panel.collapsible").filter(
+            has=page.locator("#fontsBox")
+        )
+        display_panel.locator(".ptitle").click()
+        visibility_by_mode = {
+            "1": (False, False, True, False),
+            "0": (True, False, False, False),
+            "2": (False, True, False, True),
+        }
+        selectors = ("#dimBright", "#dimTime", "#dimFullHint", "#brightness_LED0")
+        for mode, expected in visibility_by_mode.items():
+            page.select_option("#dim_mode", mode)
+            for selector, visible in zip(selectors, expected):
+                if page.locator(selector).is_visible() != visible:
+                    failures.append(f"{selector} visibility is wrong for dim mode {mode}")
 
         # Language menu
         page.click("#langBtn")
@@ -60,7 +69,7 @@ def run() -> int:
 
     for f in failures:
         print(f"FAIL {f}")
-    passed = 6 - len(failures)  # approximate check count
+    passed = 18 - len(failures)  # approximate check count
     print(f"\n{passed} checks passed, {len(failures)} failed")
     return 1 if failures else 0
 

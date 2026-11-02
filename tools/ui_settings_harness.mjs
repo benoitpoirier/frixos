@@ -268,6 +268,7 @@ document.getElementById = (id) => {
 document.querySelector = (sel) => queryAll(document, sel)[0] || null;
 document.querySelectorAll = (sel) => queryAll(document, sel);
 document.createElement = (tag) => createNode(tag);
+document.createElementNS = (_namespace, tag) => createNode(tag);
 document.addEventListener = (ev, fn) => { (document._listeners[ev] ||= []).push(fn); };
 
 function walkBody(doc) {
@@ -358,7 +359,7 @@ sandbox.removeEventListener = () => {};
 vm.createContext(sandbox);
 
 const scripts = [
-  'js/utils.js', 'js/core.js', 'js/forms.js', 'js/wifi.js', 'js/integrations.js',
+  'js/utils.js', 'js/core.js', 'js/forms.js', 'js/brightness-curve.js', 'js/wifi.js', 'js/integrations.js',
   'js/system.js', 'js/support.js', 'js/screenshot.js', 'js/savebar.js', 'js/screen-editor.js',
 ];
 let source = scripts.map(rel => fs.readFileSync(path.join(spiffs, rel), 'utf8')).join('\n;\n');
@@ -378,6 +379,7 @@ globalThis.__done = (async () => {
     p40: 1, p41: 0, p60: '', p61: '', p62: '', p63: '',
     p17: '37.9838100', p18: '23.7275400', p19: 'GMT0', tz_iana: 'Etc/UTC',
     p46: 480, p47: 0, p22: 1, p21: 12, p20: 3, p23: [80, 25],
+    p67: [0.5, 25, 5, 40, 50, 70, 500, 95],
     p42: 133, p43: 1023, p55: 420, p56: 1335,
     p25: 'http://old.local', p26: 'old-token', p27: 1, p28: 'old-key', p29: 5,
     p64: 'OLDSTATION', p65: 'old-wu-key', p66: 15,
@@ -417,8 +419,8 @@ globalThis.__done = (async () => {
   el('wifi_start').value = '06:30';
   el('wifi_end').value = '22:00';
   el('dim_mode').value = '2';
-  el('lux_threshold').value = '20.5';
-  el('lux_sensitivity').value = '8.5';
+  window.BrightnessCurve.setThreshold(20.5, 8.5);
+  window.BrightnessCurve.set([0.5, 20, 5, 40, 50, 70, 500, 90]);
   el('brightness_LED0').value = '60';
   el('brightness_LED1').value = '15';
   el('pwm_frequency').value = '250';

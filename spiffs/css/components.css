@@ -215,3 +215,78 @@ details.menu-dd > .menu-pop{ position:absolute; top:calc(100% + 6px); right:0; z
 .reboot-overlay .spinner{ margin:0 auto 18px; }
 .reboot-overlay h2{ font-family:var(--jost); font-weight:500; font-size:20px; letter-spacing:.03em; color:var(--ink); margin-bottom:10px; }
 .reboot-overlay p{ font-size:13.5px; color:var(--ink-2); line-height:1.5; }
+
+/* ---------- BRIGHTNESS CURVE ---------- */
+.bc{ display:grid; gap:10px; min-width:0; }
+.bc-card{ overflow:hidden; padding:10px 10px 6px; border:1px solid var(--hairline-soft); border-radius:16px; background:var(--glass-2); }
+.bc-chart,.bc-hist{ display:block; width:100%; overflow:visible; }
+.bc-chart{ height:220px; touch-action:none; user-select:none; -webkit-user-select:none; }
+.bc-hist{ height:192px; }
+.bc-chart text,.bc-hist text{ font-family:var(--mono); fill:var(--ink-2); font-size:10px; }
+.bc-chart .bc-bg{ fill:var(--bg-solid); }
+.bc-chart .bc-grid{ stroke:var(--hairline-soft); stroke-width:1; shape-rendering:crispEdges; }
+.bc-chart .bc-grid-minor{ stroke:var(--hairline-soft); stroke-width:.7; opacity:.4; shape-rendering:crispEdges; }
+.bc-chart .bc-axis-title{ fill:var(--ink-2); font-size:9px; letter-spacing:.04em; }
+.bc-chart .bc-area{ fill:url(#bcAreaGradient); }
+.bc-chart .bc-gradient-start{ stop-color:var(--cyan); stop-opacity:.22; }
+.bc-chart .bc-gradient-end{ stop-color:var(--cyan); stop-opacity:0; }
+.bc-chart .bc-point-gradient-start{ stop-color:var(--ink); }
+.bc-chart .bc-point-gradient-end{ stop-color:var(--bg-solid); }
+.bc-chart .bc-curve{ fill:none; stroke:var(--cyan); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.bc-chart .bc-curve-extension{ fill:none; stroke:var(--cyan); stroke-width:1.5; stroke-dasharray:4 4; opacity:.6; }
+.bc-chart .bc-band{ fill:var(--proj-amber); fill-opacity:.1; }
+.bc-chart .bc-band-edge{ stroke:var(--proj-amber); stroke-width:1; stroke-opacity:.42; }
+.bc-chart .bc-threshold-line{ stroke:var(--proj-amber); stroke-width:1.5; stroke-dasharray:3 3; }
+.bc-chart .bc-point-halo{ fill:var(--cyan); fill-opacity:.18; opacity:0; }
+.bc-chart .bc-point-disc{ fill:url(#bcPointGradient); stroke:var(--cyan); stroke-width:2; }
+.bc-chart .bc-live-line{ stroke:var(--ink-2); stroke-width:1; stroke-opacity:.55; }
+.bc-chart .bc-live-point{ fill:var(--ink); stroke:var(--bg-solid); stroke-width:1.5; }
+.bc-chart .bc-live-pulse{ fill:none; stroke:var(--cyan); stroke-width:1.5; opacity:.55; animation:bc-pulse 2.4s ease-out infinite; }
+.bc-chart .bc-live-label-bg{ fill:var(--palette-menu-bg); stroke:var(--hairline); stroke-width:1; }
+.bc-chart .bc-live-label{ fill:var(--ink); font-size:10px; font-weight:700; text-anchor:middle; }
+.bc-chart .bc-live-overflow{ fill:var(--ink-2); font-size:12px; font-weight:700; }
+.bc-chart .bc-rug{ stroke:var(--muted); stroke-width:2; stroke-linecap:round; }
+.bc-chart .bc-rug-yesterday{ opacity:.35; }
+.bc-chart .bc-rug-today{ opacity:.65; }
+.bc-chart .bc-handle{ fill:var(--proj-amber); stroke:var(--glass-2); stroke-width:1.5; }
+.bc-chart .bc-handle-icon{ fill:none; stroke:var(--ink-2); stroke-width:1.25; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+.bc-chart .bc-handle-target{ fill:transparent; stroke:transparent; pointer-events:all; }
+.bc-chart .bc-target{ fill:transparent; pointer-events:all; }
+.bc-chart .bc-point-group,.bc-chart .bc-handle-group{ cursor:grab; outline:none; }
+.bc.is-dragging .bc-point-group,.bc.is-dragging .bc-handle-group{ cursor:grabbing; }
+.bc-chart .bc-point-group.is-linked .bc-point-halo,.bc-chart .bc-point-group:focus-visible .bc-point-halo{ opacity:1; }
+.bc-chart .bc-point-group.is-active .bc-point-halo{ opacity:1; r:18px; }
+.bc-chart .bc-point-group:focus-visible .bc-point-disc,.bc-chart .bc-handle-group:focus-visible .bc-handle{ stroke:var(--cyan); stroke-width:2.5; }
+.bc-hist .bc-hist-baseline{ stroke:var(--hairline); stroke-width:1; }
+.bc-hist .bc-hist-grid{ stroke:var(--hairline-soft); stroke-width:1; stroke-dasharray:2 3; }
+.bc-hist .bc-hist-band{ fill:var(--proj-amber); fill-opacity:.09; }
+.bc-hist .bc-hist-threshold{ stroke:var(--proj-amber); stroke-width:1; stroke-dasharray:3 3; opacity:.7; }
+.bc-hist .bc-history-area-today{ fill:var(--cyan); fill-opacity:.1; }
+.bc-hist .bc-history-curve-yesterday{ fill:none; stroke:var(--muted); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:5 4; opacity:.72; }
+.bc-hist .bc-history-curve-today{ fill:none; stroke:var(--cyan); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.bc-hist .bc-history-point{ stroke:var(--bg-solid); stroke-width:1.5; }
+.bc-hist .bc-history-point-yesterday{ fill:var(--muted); opacity:.82; }
+.bc-hist .bc-history-point-today{ fill:var(--cyan); }
+.bc-hist .bc-history-point-today.is-current{ fill:var(--proj-amber); stroke-width:2; }
+.bc-hist .bc-current-hour{ fill:var(--cyan); fill-opacity:.06; stroke:none; }
+.bc-hist .bc-empty{ fill:var(--hairline); }
+.bc-hist .bc-history-legend-yesterday{ stroke:var(--muted); stroke-width:2; stroke-dasharray:3 2; }
+.bc-hist .bc-history-legend-today{ stroke:var(--cyan); stroke-width:2.5; }
+.bc-hist .bc-legend{ font-family:var(--ui); font-size:9px; fill:var(--ink-2); }
+.bc-hist .bc-no-readings{ font-family:var(--ui); fill:var(--ink-2); font-size:10px; text-anchor:middle; }
+.bc-hist .bc-rug-today{ stroke:var(--cyan); stroke-width:1; opacity:.65; }
+.bc-hist .bc-rug-yesterday{ stroke:var(--muted); stroke-width:1; opacity:.35; }
+.bc-threshold-error{ display:block; margin-top:5px; color:var(--proj-red); font-size:10px; line-height:1.35; }
+.bc-threshold-error[hidden],.bc-status[hidden]{ display:none; }
+.bc-hint{ margin:0 3px; color:var(--ink-2); font-size:11px; line-height:1.45; }
+.bc-status{ padding:7px 10px; border:1px solid var(--hairline-soft); border-radius:10px; color:var(--ink-2); background:var(--net-bg); font-size:11px; }
+.bc[data-state=loading] .bc-card{ opacity:.62; }
+.bc[data-state=loading] .bc-chart{ animation:bc-loading 1.4s ease-in-out infinite alternate; }
+@keyframes bc-pulse{ 0%{ opacity:.7; r:5px; } 100%{ opacity:0; r:10px; } }
+@keyframes bc-loading{ to{ opacity:.7; } }
+@media(max-width:420px){
+  .bc-card{ padding:7px 5px 4px; }
+}
+@media(prefers-reduced-motion:reduce){
+  .bc *{ animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+}

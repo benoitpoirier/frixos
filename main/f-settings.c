@@ -13,6 +13,7 @@
 #include "f-screen-layout-bin.h"
 #include "f-layout-migrate.h"
 #include "f-pwm.h"
+#include "f-adaptive.h"
 #include "f-wifi.h"
 #include "f-ota.h"
 #include "f-wu.h"
@@ -21,6 +22,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <math.h>
+#include <time.h>
 #include <dirent.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -80,6 +82,7 @@
  * - p55 = dim_start (Time-of-day dimming start, minutes from midnight)
  * - p56 = dim_end (Time-of-day dimming end, minutes from midnight)
  * - p23 = brightness_LED (LED brightness array)
+ * - p67 = adapt_curve ([lux0,pct0,...,lux3,pct3])
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
  * - p42 = pwm_frequency (PWM frequency in Hz, range 60-50000)
@@ -113,6 +116,12 @@
 static const char *TAG = "f-settings";
 
 #define SCREEN_LAYOUT_MIME "application/vnd.frixos.screen-layout+1"
+#define LUX_HISTORY_JSON_BUFFER_SIZE 384U
+#define EXT_MASK_P64 0x01U
+#define EXT_MASK_P65 0x02U
+#define EXT_MASK_P66 0x04U
+#define EXT_MASK_P67 0x08U
+#define EXT_MASK_ALL 0x0FU
 
 // HTTP server handle
 static httpd_handle_t server = NULL;
@@ -602,15 +611,15 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "advanced") == 0)
         {
-            // p01-p24, p42, p43, p46, p47, p50, p55, p56
+            // p01-p24, p42, p43, p46, p47, p50, p55, p56; p67 uses the extended mask.
             for (int i = 1; i <= 24; i++) mask |= (1ULL << i);
             mask |= (1ULL << 42) | (1ULL << 43) | (1ULL << 46) |
                     (1ULL << 47) | (1ULL << 50) | (1ULL << 55) | (1ULL << 56);
         }
-            else if (strcmp(group, "integrations") == 0)
+        else if (strcmp(group, "integrations") == 0)
         {
             // p25-p33, p44, p45, p51-p54
-            // p64-p66 (Weather Underground) are outside this mask; wu_settings_mask adds them.
+            // p64-p66 (Weather Underground) are outside this mask; the extended mask adds them.
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
@@ -640,15 +649,17 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
     return mask;
 }
 
-/* p64–p66 sit past the uint64 settings mask. Bits: 1=p64, 2=p65, 4=p66. */
-static uint8_t wu_settings_mask(const char *group, const char *params)
+/* p64-p67 sit past the uint64 settings mask. Bits 0-3 select p64-p67. */
+static uint8_t extended_settings_mask(const char *group, const char *params)
 {
     if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
-        return 0x7;
+        return EXT_MASK_ALL;
 
     uint8_t bits = 0;
     if (group && strcmp(group, "integrations") == 0)
-        bits |= 0x7;
+        bits |= EXT_MASK_P64 | EXT_MASK_P65 | EXT_MASK_P66;
+    if (group && strcmp(group, "advanced") == 0)
+        bits |= EXT_MASK_P67;
 
     if (params && params[0] != '\0')
     {
@@ -657,11 +668,13 @@ static uint8_t wu_settings_mask(const char *group, const char *params)
         {
             p++;
             if (strncmp(p, "64", 2) == 0 && !isdigit((unsigned char)p[2]))
-                bits |= 0x1;
+                bits |= EXT_MASK_P64;
             else if (strncmp(p, "65", 2) == 0 && !isdigit((unsigned char)p[2]))
-                bits |= 0x2;
+                bits |= EXT_MASK_P65;
             else if (strncmp(p, "66", 2) == 0 && !isdigit((unsigned char)p[2]))
-                bits |= 0x4;
+                bits |= EXT_MASK_P66;
+            else if (strncmp(p, "67", 2) == 0 && !isdigit((unsigned char)p[2]))
+                bits |= EXT_MASK_P67;
         }
     }
     return bits;
@@ -672,6 +685,13 @@ esp_err_t send_json_settings(httpd_req_t *req)
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings GET request received");
     esp_err_t ret = ESP_OK;
     cJSON *root = cJSON_CreateObject();
+    char *json_str = NULL;
+    if (root == NULL)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "Failed to create settings response");
+        return ESP_FAIL;
+    }
 
     // Parse query parameters into local buffers to fix the static buffer overwrite bug in get_query_param
     char group_local[64] = {0};
@@ -688,7 +708,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
 
     // Pre-calculate inclusion mask once to optimize performance from O(N*M) to O(1)
     uint64_t mask = calculate_include_mask(group_local, params_local);
-    uint8_t wu_mask = wu_settings_mask(group_local, params_local);
+    uint8_t extended_mask = extended_settings_mask(group_local, params_local);
 
     // Add parameters based on mask
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
@@ -721,6 +741,73 @@ esp_err_t send_json_settings(httpd_req_t *req)
             cJSON_AddItemToArray(brightness_array, cJSON_CreateNumber(eeprom_brightness_LED[i]));
         }
         cJSON_AddItemToObject(root, "p23", brightness_array);
+    }
+
+    if (extended_mask & EXT_MASK_P67)
+    {
+        adaptive_curve_t curve;
+        if (adaptive_curve_get(&curve))
+        {
+            cJSON *curve_array = cJSON_CreateArray();
+            if (!curve_array)
+            {
+                ret = ESP_ERR_NO_MEM;
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                    "Failed to create adaptive curve response");
+                goto cleanup;
+            }
+            for (size_t i = 0; i < ADAPT_CURVE_POINTS; i++)
+            {
+                cJSON *lux_value = cJSON_CreateNumber((double)curve.lux_x10[i] /
+                                                      (double)LUX_HIST_SCALE);
+                cJSON *pct_value = cJSON_CreateNumber(curve.pct[i]);
+                if (lux_value == NULL || pct_value == NULL)
+                {
+                    cJSON_Delete(lux_value);
+                    cJSON_Delete(pct_value);
+                    cJSON_Delete(curve_array);
+                    ret = ESP_ERR_NO_MEM;
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                        "Failed to create adaptive curve response");
+                    goto cleanup;
+                }
+                if (!cJSON_AddItemToArray(curve_array, lux_value))
+                {
+                    cJSON_Delete(lux_value);
+                    cJSON_Delete(pct_value);
+                    cJSON_Delete(curve_array);
+                    ret = ESP_ERR_NO_MEM;
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                        "Failed to create adaptive curve response");
+                    goto cleanup;
+                }
+                if (!cJSON_AddItemToArray(curve_array, pct_value))
+                {
+                    cJSON_Delete(pct_value);
+                    cJSON_Delete(curve_array);
+                    ret = ESP_ERR_NO_MEM;
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                        "Failed to create adaptive curve response");
+                    goto cleanup;
+                }
+            }
+            if (!cJSON_AddItemToObject(root, "p67", curve_array))
+            {
+                cJSON_Delete(curve_array);
+                ret = ESP_ERR_NO_MEM;
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                    "Failed to create adaptive curve response");
+                goto cleanup;
+            }
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stored adaptive brightness curve is invalid");
+            ret = ESP_FAIL;
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                "Stored adaptive brightness curve is invalid");
+            goto cleanup;
+        }
     }
 
     if (mask & (1ULL << 36)) cJSON_AddNumberToObject(root, "p36", eeprom_fahrenheit);
@@ -756,9 +843,9 @@ esp_err_t send_json_settings(httpd_req_t *req)
     // Add Stock Quote Service settings
     if (mask & (1ULL << 28)) cJSON_AddStringToObject(root, "p28", eeprom_stock_key);
     if (mask & (1ULL << 29)) cJSON_AddNumberToObject(root, "p29", eeprom_stock_refresh_mins);
-    if (wu_mask & 0x1) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
-    if (wu_mask & 0x2) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
-    if (wu_mask & 0x4) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
+    if (extended_mask & EXT_MASK_P64) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
+    if (extended_mask & EXT_MASK_P65) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
+    if (extended_mask & EXT_MASK_P66) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
 
     // Add Dexcom settings
     if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
@@ -777,11 +864,13 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 53)) cJSON_AddNumberToObject(root, "p53", eeprom_glucose_unit);
 
     // Convert to string and send response
-    char *json_str = cJSON_PrintUnformatted(root);
+    json_str = cJSON_PrintUnformatted(root);
     if (!json_str)
     {
         ESP_LOGE(TAG, "Failed to create JSON string");
         ret = ESP_FAIL;
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "Failed to create settings response");
         goto cleanup;
     }
 
@@ -1065,6 +1154,67 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
         }
     }
 
+    /* p67 adaptive curve: four [lux, percent] points with 0.1-lux storage precision. */
+    if (cJSON_HasObjectItem(root, "p67"))
+    {
+        item = cJSON_GetObjectItem(root, "p67");
+        if (!cJSON_IsArray(item) ||
+            cJSON_GetArraySize(item) != ADAPT_CURVE_POINTS * 2)
+        {
+            snprintf(err_buf, err_size, "Invalid adaptive curve: expected exactly %d values",
+                     ADAPT_CURVE_POINTS * 2);
+            return false;
+        }
+
+        uint16_t previous_lux_x10 = 0;
+        for (int i = 0; i < ADAPT_CURVE_POINTS * 2; i++)
+        {
+            cJSON *value = cJSON_GetArrayItem(item, i);
+            if (!cJSON_IsNumber(value) || !isfinite(value->valuedouble))
+            {
+                snprintf(err_buf, err_size, "Invalid adaptive curve: values must be finite numbers");
+                return false;
+            }
+
+            if ((i % 2) == 0)
+            {
+                if (value->valuedouble <
+                        (double)ADAPT_CURVE_MIN_LUX_X10 / LUX_HIST_SCALE ||
+                    value->valuedouble >
+                        (double)ADAPT_CURVE_MAX_LUX_X10 / LUX_HIST_SCALE)
+                {
+                    snprintf(err_buf, err_size,
+                             "Invalid adaptive curve: lux values must be 0.1-6553.0");
+                    return false;
+                }
+
+                const double scaled_lux = value->valuedouble * (double)LUX_HIST_SCALE;
+                const long lux_x10 = lround(scaled_lux);
+                if (fabs(scaled_lux - (double)lux_x10) > 0.001 ||
+                    lux_x10 < ADAPT_CURVE_MIN_LUX_X10 ||
+                    lux_x10 > ADAPT_CURVE_MAX_LUX_X10 ||
+                    ((i > 0) && lux_x10 <= previous_lux_x10) ||
+                    ((i > 0) &&
+                     (uint64_t)lux_x10 * ADAPT_CURVE_MIN_GAP_DENOMINATOR <
+                         (uint64_t)previous_lux_x10 * ADAPT_CURVE_MIN_GAP_NUMERATOR))
+                {
+                    snprintf(err_buf, err_size,
+                             "Invalid adaptive curve: lux values must be 0.1-6553.0 and at least 0.1 decade apart");
+                    return false;
+                }
+                previous_lux_x10 = (uint16_t)lux_x10;
+            }
+            else if (value->valuedouble < ADAPT_CURVE_MIN_LEVEL ||
+                     value->valuedouble > ADAPT_CURVE_MAX_LEVEL ||
+                     floor(value->valuedouble) != value->valuedouble)
+            {
+                snprintf(err_buf, err_size,
+                         "Invalid adaptive curve: brightness values must be whole percentages from 1 to 100");
+                return false;
+            }
+        }
+    }
+
     /* p20 lux_sensitivity */
     if ((item = cJSON_GetObjectItem(root, "p20")) && cJSON_IsNumber(item))
         CHECK_DOUBLE_RANGE("lux_sensitivity", item->valuedouble, 0, 50);
@@ -1072,6 +1222,24 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p21 lux_threshold */
     if ((item = cJSON_GetObjectItem(root, "p21")) && cJSON_IsNumber(item))
         CHECK_DOUBLE_RANGE("lux_threshold", item->valuedouble, 0, 500);
+
+    if (cJSON_HasObjectItem(root, "p20") || cJSON_HasObjectItem(root, "p21"))
+    {
+        const cJSON *sensitivity_item = cJSON_GetObjectItem(root, "p20");
+        const cJSON *threshold_item = cJSON_GetObjectItem(root, "p21");
+        const double sensitivity = cJSON_IsNumber(sensitivity_item)
+                                       ? sensitivity_item->valuedouble
+                                       : eeprom_lux_sensitivity;
+        const double threshold = cJSON_IsNumber(threshold_item)
+                                     ? threshold_item->valuedouble
+                                     : eeprom_lux_threshold;
+        if (sensitivity > threshold)
+        {
+            snprintf(err_buf, err_size,
+                     "Invalid day/night switch: threshold must be at least the sensitivity");
+            return false;
+        }
+    }
 
     /* p04 dayfont, p05 nightfont */
     if ((item = cJSON_GetObjectItem(root, "p04")) && cJSON_IsString(item))
@@ -1723,6 +1891,28 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         }
     }
 
+    cJSON *adaptive_curve_array = cJSON_GetObjectItem(root, "p67");
+    if (cJSON_IsArray(adaptive_curve_array))
+    {
+        adaptive_curve_t curve = {0};
+        for (size_t i = 0; i < ADAPT_CURVE_POINTS; i++)
+        {
+            const cJSON *lux_item = cJSON_GetArrayItem(adaptive_curve_array, (int)(i * 2));
+            const cJSON *pct_item = cJSON_GetArrayItem(adaptive_curve_array, (int)(i * 2 + 1));
+            curve.lux_x10[i] = (uint16_t)lround(lux_item->valuedouble * LUX_HIST_SCALE);
+            curve.pct[i] = (uint8_t)lround(pct_item->valuedouble);
+        }
+        if (!adaptive_curve_set(&curve))
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Validated adaptive brightness curve could not be applied");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                "Could not apply adaptive brightness curve");
+            cJSON_Delete(root);
+            root = NULL;
+            goto cleanup;
+        }
+    }
+
     // Process light sensor settings
     cJSON *lux_sensitivity = cJSON_GetObjectItem(root, "p20");
     if (cJSON_IsNumber(lux_sensitivity))
@@ -2136,7 +2326,15 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         goto cleanup;
     }
 
-    set_led_pwm_brightness(eeprom_brightness_LED[font_index]); // set the brightness again, in case something changed
+    if (eeprom_dim_mode == DIM_MODE_BRIGHTNESS && !manufacturer_mode)
+    {
+        if (pwm_frequency_changed)
+            set_led_pwm_brightness(pwm_get_current_brightness());
+    }
+    else
+    {
+        set_led_pwm_brightness(brightness_target_percent());
+    }
 
     // Check if critical settings have changed
     bool critical_settings_changed = false;
@@ -2310,14 +2508,52 @@ esp_err_t status_api_handler(httpd_req_t *req)
     char logs_buffer[8] = {0};
     get_request_query_param(req, "logs", logs_buffer, sizeof(logs_buffer));
     bool include_logs = (logs_buffer[0] != '\0' && strcmp(logs_buffer, "1") == 0);
+    char lux_history_buffer[8] = {0};
+    get_request_query_param(req, "luxhist", lux_history_buffer, sizeof(lux_history_buffer));
+    bool include_lux_history =
+        (lux_history_buffer[0] != '\0' && strcmp(lux_history_buffer, "1") == 0);
+    char light_buffer[8] = {0};
+    get_request_query_param(req, "light", light_buffer, sizeof(light_buffer));
+    bool include_light_sample =
+        (light_buffer[0] != '\0' && strcmp(light_buffer, "1") == 0);
 
     // Set response headers first to ensure proper HTTP response
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
 
+    cJSON *root = NULL;
+    if (include_light_sample)
+    {
+        int local_hour = -1;
+        if (time_valid)
+        {
+            time_t now = time(NULL);
+            struct tm local_time;
+            if (localtime_r(&now, &local_time) != NULL)
+                local_hour = local_time.tm_hour;
+        }
+
+        char light_json[64];
+        const int length = snprintf(light_json, sizeof(light_json),
+                                    "{\"lux\":%.2f,\"local_hour\":%d}",
+                                    (double)display_get_cached_lux(), local_hour);
+        if (length < 0 || (size_t)length >= sizeof(light_json))
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Could not serialize cached light sample");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                "Could not serialize cached light sample");
+            goto cleanup;
+        }
+        ret = httpd_resp_send(req, light_json, length);
+        if (ret != ESP_OK)
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Cached light sample response failed: %s",
+                        esp_err_to_name(ret));
+        goto cleanup;
+    }
+
     // Create JSON with minimal initial allocation
-    cJSON *root = cJSON_CreateObject();
+    root = cJSON_CreateObject();
     if (!root)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create JSON root object");
@@ -2418,6 +2654,13 @@ esp_err_t status_api_handler(httpd_req_t *req)
 
     // Add weather and time status with timestamps
     time_t current_time = time(NULL);
+    int local_hour = -1;
+    if (time_valid)
+    {
+        struct tm local_time;
+        if (localtime_r(&current_time, &local_time) != NULL)
+            local_hour = local_time.tm_hour;
+    }
     bool weather_status = (current_time - last_weather_update) < (6 * 3600); // 6 hours
     bool time_status = (current_time - last_time_update) < (2 * 3600);       // 2 hours
 
@@ -2425,6 +2668,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "time_status", time_status);
     cJSON_AddNumberToObject(root, "last_weather_update", (double)last_weather_update);
     cJSON_AddNumberToObject(root, "last_time_update", (double)last_time_update);
+    cJSON_AddNumberToObject(root, "local_hour", local_hour);
     cJSON_AddNumberToObject(root, "uptime", (double)(esp_timer_get_time() / 1000000ULL));
     char scroll_stall[384];
     scroll_stall_report(scroll_stall, sizeof(scroll_stall));
@@ -2432,12 +2676,34 @@ esp_err_t status_api_handler(httpd_req_t *req)
 
     // Add sensor and location data
     // Add sensor data
-    double lux = ltr303_get_frixos_lux();
-    lux = round(lux * 100.0) / 100.0; // Round to 2 decimal places
+    float lux = display_get_cached_lux();
+    lux = roundf(lux * 100.0f) / 100.0f; // Round to 2 decimal places
     cJSON_AddNumberToObject(root, "lux", lux);
     cJSON_AddStringToObject(root, "latitude", my_lat);
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
+
+    if (include_lux_history)
+    {
+        char history_json[LUX_HISTORY_JSON_BUFFER_SIZE];
+        if (lux_history_write_json(history_json, sizeof(history_json)) < 0)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Could not serialize ambient light history");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                "Could not serialize ambient light history");
+            goto cleanup;
+        }
+
+        cJSON *history = cJSON_CreateRaw(history_json);
+        if (history == NULL || !cJSON_AddItemToObject(root, "luxhist", history))
+        {
+            cJSON_Delete(history);
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Could not add ambient light history to status response");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                "Could not add ambient light history");
+            goto cleanup;
+        }
+    }
 
     if (include_logs)
     {

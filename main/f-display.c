@@ -13,6 +13,7 @@
 #include "f-display.h"
 #include "f-screenshot.h"
 #include "f-pwm.h"
+#include "f-adaptive.h"
 #include "f-time.h"
 #include "f-wifi.h"
 #include "f-settings.h"
@@ -35,6 +36,9 @@
 #include "lvgl.h"
 #include "draw/lv_image_decoder.h"
 #include "draw/lv_draw_buf.h"
+
+#define ALS_BRIGHTNESS_SAMPLE_INTERVAL_US 5000000LL
+#define ALS_HISTORY_SAMPLE_INTERVAL_US 60000000LL
 
 /* Bitmap fonts have unused rows above glyphs inside line_height; trim bg only, not text.
  * Keep in sync with SCREEN_LABEL_BG_TOP_TRIM in spiffs/index.js. */
@@ -106,7 +110,17 @@ static const char *month_names[9][12] = {
     // Spanish
     {"Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"}};
 char msg_scrolling[SCROLL_MSG_LENGTH]; // scrolling message text
-double lux = 0;
+static float lux = 0;
+static portMUX_TYPE s_lux_mux = portMUX_INITIALIZER_UNLOCKED;
+
+float display_get_cached_lux(void)
+{
+  float cached_lux;
+  portENTER_CRITICAL(&s_lux_mux);
+  cached_lux = lux;
+  portEXIT_CRITICAL(&s_lux_mux);
+  return cached_lux;
+}
 // Include the generated sprite sheet image
 lv_obj_t *img_weather = NULL,
          *img_moon = NULL,
@@ -2486,13 +2500,14 @@ static time_t lastrun = 0;
 
 static bool is_time_of_day_bright(void)
 {
+  if (!time_valid)
+    return true;
+
   time_t now;
   struct tm timeinfo;
 
   time(&now);
   localtime_r(&now, &timeinfo);
-  if (timeinfo.tm_year + 1900 <= 2025)
-    return true;
 
   return is_time_in_range(eeprom_dim_start, eeprom_dim_end, timeinfo.tm_hour * 60 + timeinfo.tm_min);
 }
@@ -2502,6 +2517,11 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   (void)loop_counter; // cadence is now time-based, independent of loop rate
   static int64_t als_last_read_us = 0;
   uint8_t old_font_index = font_index;
+  const bool adaptive_mode_active =
+      !manufacturer_mode && eeprom_dim_mode == DIM_MODE_BRIGHTNESS;
+  const int64_t sample_interval_us = adaptive_mode_active
+                                         ? ALS_BRIGHTNESS_SAMPLE_INTERVAL_US
+                                         : ALS_HISTORY_SAMPLE_INTERVAL_US;
 
   if (manufacturer_mode || eeprom_dim_mode == DIM_MODE_FULL)
   {
@@ -2511,25 +2531,35 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   {
     font_index = is_time_of_day_bright() ? 0 : 1;
   }
-  else if ((esp_timer_get_time() - als_last_read_us) >= 5000000)
+
+  if ((esp_timer_get_time() - als_last_read_us) >= sample_interval_us)
   {
-    // read ALS sensor every 5 seconds (time-based, independent of loop period)
+    // Sample every 5 seconds in adaptive mode and once a minute otherwise.
     als_last_read_us = esp_timer_get_time();
     int64_t t_als = esp_timer_get_time();
-    lux = ltr303_get_frixos_lux();
+    const float sensor_lux = (float)ltr303_get_frixos_lux();
+    portENTER_CRITICAL(&s_lux_mux);
+    lux = sensor_lux;
+    portEXIT_CRITICAL(&s_lux_mux);
     stall_note("als", esp_timer_get_time() - t_als);
 
-    if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
-      font_index = 0;
-    else if (lux < eeprom_lux_threshold - eeprom_lux_sensitivity)
-      font_index = 1;
+    if (adaptive_mode_active)
+    {
+      if (sensor_lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
+        font_index = 0;
+      else if (sensor_lux < eeprom_lux_threshold - eeprom_lux_sensitivity)
+        font_index = 1;
+    }
+
+    adaptive_tick(sensor_lux);
   }
 
   if (font_index != old_font_index)
   {
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (mode %u lux %.1f thres %.1f)",
                 old_font_index, font_index, eeprom_dim_mode, lux, eeprom_lux_threshold);
-    set_led_pwm_brightness(eeprom_brightness_LED[font_index]);
+    if (!adaptive_mode_active)
+      set_led_pwm_brightness(brightness_target_percent());
     display_changed();
   }
 }

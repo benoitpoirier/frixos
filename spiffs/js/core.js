@@ -150,6 +150,7 @@ function refreshDynamicI18n() {
     fillLayoutSelect('settingsLayoutSelect');
   }
   if (typeof refreshScreenshotI18n === 'function') refreshScreenshotI18n();
+  if (window.BrightnessCurve) window.BrightnessCurve.refreshI18n();
 }
 
 /* ---------- i18n apply ---------- */

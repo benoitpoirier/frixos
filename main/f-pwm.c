@@ -1,5 +1,6 @@
 #include "frixos.h"
 #include "f-pwm.h"
+#include "f-adaptive.h"
 #include "driver/dac_oneshot.h"
 
 static const char *TAG = "f-pwm";
@@ -41,11 +42,7 @@ uint16_t pwm_get_effective_max_power(void)
 
 static uint8_t active_brightness_percent(void)
 {
-    uint8_t profile = (font_index <= 1) ? font_index : 0;
-    uint8_t pct = eeprom_brightness_LED[profile];
-    if (pct > 100)
-        pct = 100;
-    return pct;
+    return brightness_target_percent();
 }
 
 static uint16_t duty_from_percent(uint8_t pct)
@@ -208,14 +205,16 @@ esp_err_t reconfigure_led_pwm_frequency(void)
 
 
 
-// accepts brightness percentage (0-100)
-void set_led_pwm_brightness(uint8_t duty)
+static void set_led_pwm_brightness_internal(uint8_t duty, bool quiet)
 {
-
-    (duty > 100) ? (duty = 100) : (duty = duty);  // Ensure duty cycle is between 0 and 100
+    if (duty > 100)
+        duty = 100;
     int pwm_duty = (int)duty_from_percent(duty);
     uint8_t dac_val = scale_10bit_to_dac8((uint16_t)pwm_duty);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (pwm duty %i, dac %u)", duty, pwm_duty, dac_val);
+    if (quiet)
+        ESP_LOG_WEB(ESP_LOG_DEBUG, TAG, "LED brightness %i%% (pwm duty %i, dac %u)", duty, pwm_duty, dac_val);
+    else
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (pwm duty %i, dac %u)", duty, pwm_duty, dac_val);
     if (!led_pwm_configured && !led_dac_configured)
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LED brightness skipped: PWM/DAC not configured");
@@ -241,4 +240,15 @@ void set_led_pwm_brightness(uint8_t duty)
     }
 
     apply_led_dac((uint16_t)pwm_duty);
+}
+
+// Accepts brightness percentage (0-100).
+void set_led_pwm_brightness(uint8_t duty)
+{
+    set_led_pwm_brightness_internal(duty, false);
+}
+
+void set_led_pwm_brightness_quiet(uint8_t duty)
+{
+    set_led_pwm_brightness_internal(duty, true);
 }

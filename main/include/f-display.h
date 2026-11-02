@@ -22,6 +22,7 @@ void display_changed(void);
 void update_graph(void); // render the generic graph widget
 void show_qr_code(void);
 void display_task(void *pvParameters);
+float display_get_cached_lux(void);
 void replace_placeholders(const char *input, char* output, size_t output_size);
 void set_scroll_message(const char *message);
 void set_scroll_widget_message(const char *message, const text_widget_cfg_t *widget, bool visible);

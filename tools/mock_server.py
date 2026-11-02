@@ -1,4 +1,7 @@
 import os
+import math
+import time
+from datetime import datetime
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +38,11 @@ settings = {
     "p61": "",
     "p62": "255.255.255.0",
     "p63": "",
+    "p20": 6.0,
+    "p21": 16.0,
+    "p22": 0,
+    "p23": [100, 30],
+    "p67": [10.0, 30, 14.0, 45, 20.0, 75, 28.2, 100],
 }
 
 @app.get("/")
@@ -95,8 +103,28 @@ async def get_i18n_language(lang: str):
         return FileResponse(path)
     return JSONResponse(status_code=404, content={"message": "Not found"})
 
+def synthetic_lux(hour: int) -> float:
+    if hour < 5:
+        return 0.4
+    if hour < 9:
+        return 2.0 + (hour - 5) * 28.0
+    if hour < 15:
+        return 115.0 + 285.0 * math.sin((hour - 9) * math.pi / 6.0)
+    if hour < 19:
+        return 90.0 - (hour - 15) * 18.0
+    return 32.0
+
+
 @app.get("/api/status")
-async def get_status(logs: str = None):
+async def get_status(logs: str = None, luxhist: str = None, day1: str = None,
+                     empty: str = None, light: str = None):
+    now = datetime.now()
+    day1 = day1 or os.getenv("MOCK_LUX_DAY1")
+    empty = empty or os.getenv("MOCK_LUX_EMPTY")
+    live_lux = max(0.0, synthetic_lux(now.hour) + 2.0 * math.sin(time.time() / 4.0))
+    if light == "1":
+        return JSONResponse(content={"lux": round(live_lux, 1), "local_hour": now.hour})
+
     status_data = {
         "wifi_connected": True,
         "connected_ssid": "MockSSID",
@@ -122,7 +150,8 @@ async def get_status(logs: str = None):
         "last_weather_update": 1698393600,
         "last_time_update": 1698393600,
         "uptime": 3600,
-        "lux": 150.5,
+        "lux": round(live_lux, 1),
+        "local_hour": now.hour,
         "latitude": "40.7128",
         "longitude": "-74.0060",
         "timezone": "EST5EDT,M3.2.0,M11.1.0"
@@ -131,6 +160,23 @@ async def get_status(logs: str = None):
     if logs == "1":
         status_data["system_logs"] = ["Mock log line 1", "Mock log line 2"]
         status_data["ha_tokens"] = ["Home Assistant tokens: 1", "0: temp entity sensor.temp path state value 22.5"]
+
+    if luxhist == "1":
+        if empty == "1":
+            today = [-1] * 24
+            yesterday = [-1] * 24
+        else:
+            today = [
+                round(synthetic_lux(hour) * 10) if hour <= now.hour else -1
+                for hour in range(24)
+            ]
+            yesterday = [
+                round(synthetic_lux(hour) * 10)
+                for hour in range(24)
+            ]
+            if day1 == "1":
+                yesterday = [-1] * 24
+        status_data["luxhist"] = {"h": now.hour, "t": today, "y": yesterday}
 
     return JSONResponse(content=status_data)
 

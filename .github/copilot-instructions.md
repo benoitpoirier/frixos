@@ -68,7 +68,7 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 ### Architecture
 - Single-page app served from the SPIFFS partition `spiffs` (offset `0x670000`, size `0x180000` = 1.5 MB, see `partitions.csv`).
 - Source of truth: `spiffs/` (packed into `build/spiffs.bin`). `frixos-ui/` also exists with `app.js`, `app.css` and `index.html`, which are not in `spiffs/`. Confirm which copy the change belongs to before editing.
-- Layout: `spiffs/index.html`; JS in `spiffs/js/` (core, forms, integrations, savebar, screen-editor, support, system, utils, wifi); CSS in `spiffs/css/` (components, forms, layout, screen-editor, variables); i18n in `spiffs/i18n/`; screen layouts `spiffs/*.layout` (Default, Diabetic, HAGraph, HomeAssistant, Weather); images in `spiffs/`.
+- Layout: `spiffs/index.html`; JS in `spiffs/js/` (core, forms, brightness-curve, integrations, savebar, screen-editor, support, system, utils, wifi); CSS in `spiffs/css/` (components, forms, layout, screen-editor, variables); i18n in `spiffs/i18n/`; screen layouts `spiffs/*.layout` (Default, Diabetic, HAGraph, HomeAssistant, Weather); images in `spiffs/`.
 - **Files are NOT minified.** The `spiffs/` folder is packed as-is.
 - JPEG assets dominate the partition size (folder ~1.2 MB in total).
 - OTA does not update SPIFFS. Flash it separately: `idf.py spiffs-flash` or `esptool.py write_flash 0x670000 build/spiffs.bin`.
@@ -78,7 +78,9 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 - Keys use short `pXX` names for HTTP efficiency (e.g. `p60`=static_ip, `p61`=static_gw, `p62`=static_nm, `p63`=static_dns).
 - Group filters: `settings`, `advanced`, `integrations`, `theme`.
 - Shared HTTP buffer pool: `get_shared_buffer()` in `f-membuffer.c`.
-- Status endpoint: `GET /api/status` returns network info (`ip_address`, `ip_gw`, `ip_nm`, `ip_dns1`, `ip_dns2`).
+- Status endpoint: `GET /api/status` returns network info (`ip_address`, `ip_gw`, `ip_nm`, `ip_dns1`, `ip_dns2`). Use `?light=1` for cached lux/hour polling; it must not trigger another sensor read.
+- Adaptive brightness curve is the NVS blob `adapt_curve`, exposed as `p67` by the extended settings mask (keys `p64`–`p67` are above the `uint64_t` mask). Keep its four lux points increasing with at least `0.1` decade spacing.
+- Hourly LTR303 history is held in `RTC_NOINIT_ATTR` by `main/f-adaptive.c` and exposed on demand as `/api/status?luxhist=1`; do not add periodic NVS writes or another HTTP URI for this feature.
 
 ### i18n Rules
 - All user-facing strings use `data-i18n="key.path"` attributes; JS resolves them at runtime.
@@ -96,7 +98,7 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 ## 🔑 NVS Settings
 
 - Namespace: `frixos`.
-- All persistent settings are declared in `settings_table[]` in `main/main.c` with `SETTING_TYPE_STR` or numeric types.
+- All persistent settings are declared in `settings_table[]` in `main/main.c` with `SETTING_TYPE_STR`, numeric types, or `SETTING_TYPE_BLOB`.
 - Extern declarations for cross-module access live in `main/include/frixos.h`.
 - Static IP variables: `eeprom_static_ip[16]`, `eeprom_static_gw[16]`, `eeprom_static_nm[16]`, `eeprom_static_dns[40]` (keys p60–p63).
 - Static IP applied in `connect_to_wifi()` (`f-provisioning.c`): `esp_netif_dhcpc_stop()` → `esp_netif_set_ip_info()` before `esp_wifi_connect()`. Falls back to DHCP on error.

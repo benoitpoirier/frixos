@@ -86,6 +86,7 @@
     const sp = collectSettingsPayload();
     if (sp === null) return; // hostname validation failed; user was focused there
     const ap = collectAdvancedPayload();
+    if (ap === null) return;
     // Only include tabs whose values have actually been loaded into the DOM —
     // otherwise HTML defaults would be diffed against stored settings.
     const ip = loadedSections.integrations ? collectIntegrationsPayload() : {};
