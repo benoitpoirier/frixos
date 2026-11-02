@@ -15,11 +15,9 @@
     "save_settings": "Enregistrer les paramètres",
     "cancel": "Annuler",
     "change_language": "Changer de langue",
-    "current": "Actuel",
     "file": "Fichier",
     "hide_password": "Masquer le mot de passe",
     "insert": "Insérer",
-    "load": "Charger",
     "none": "Aucun",
     "offline": "Hors ligne",
     "online": "En ligne",
@@ -289,12 +287,6 @@
       "blue": "Bleu",
       "bw": "Noir et blanc"
     },
-    "fonts": {
-      "title": "Polices",
-      "desc": "Choisissez la police de l’horloge pour le jour et la nuit. Cela met à jour la disposition et l’applique aussitôt.",
-      "day": "Jour",
-      "night": "Nuit"
-    },
     "location": {
       "title": "Emplacement",
       "latitude": "Latitude",
@@ -371,6 +363,7 @@
       "dim_end": "Fin du jour",
       "led_day": "Luminosité (Jour)",
       "led_night": "Luminosité (Nuit)",
+      "led_settings": "Paramètres LED",
       "pwm_frequency": "Fréquence PWM",
       "max_power": "Puissance maximale"
     },
@@ -640,8 +633,6 @@
     "file_renamed": "Fichier renommé",
     "files_deleted": "{n} fichier(s) supprimé(s)",
     "files_refreshed": "Fichiers actualisés",
-    "layout_applied": "Disposition appliquée à l'appareil",
-    "layout_apply_failed": "Échec de l'application de la disposition : ",
     "no_changes": "Aucune modification à enregistrer",
     "rename_failed": "Échec du renommage",
     "rename_prompt": "Renommer « {name} » en :",
@@ -651,8 +642,7 @@
     "logs_refreshed": "Journaux actualisés",
     "upload_failed": "Échec du téléchargement",
     "changes_discarded": "Modifications ignorées",
-    "wifi_not_connected": "Le Wi-Fi n’est pas connecté.",
-    "font_applied": "Police appliquée."
+    "wifi_not_connected": "Le Wi-Fi n’est pas connecté."
   },
   "files": {
     "delete_selected": "Supprimer la sélection",

@@ -35,7 +35,7 @@ def run() -> int:
         # Display brightness mode panels
         page.click('#nav a[data-tab="settings"]')
         display_panel = page.locator("#tab-settings .panel.collapsible").filter(
-            has=page.locator("#fontsBox")
+            has=page.locator("#dim_mode")
         )
         display_panel.locator(".ptitle").click()
         visibility_by_mode = {

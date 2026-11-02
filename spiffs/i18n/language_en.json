@@ -22,8 +22,6 @@
     "select_font": "Select {name} font",
     "scroll_tabs_left": "Scroll tabs left",
     "scroll_tabs_right": "Scroll tabs right",
-    "current": "Current",
-    "load": "Load",
     "none": "None",
     "file": "File",
     "online": "Online",
@@ -289,12 +287,6 @@
       "blue": "Blue",
       "bw": "Black & White"
     },
-    "fonts": {
-      "title": "Fonts",
-      "desc": "Pick the clock font for day and night. This updates the layout and applies it right away.",
-      "day": "Day",
-      "night": "Night"
-    },
     "location": {
       "title": "Location",
       "latitude": "Latitude",
@@ -371,6 +363,7 @@
       "dim_end": "Day ends",
       "led_day": "Brightness (Day)",
       "led_night": "Brightness (Night)",
+      "led_settings": "LED settings",
       "pwm_frequency": "PWM Frequency",
       "max_power": "Max Power"
     },
@@ -643,8 +636,6 @@
     "layout_read_invalid": "Invalid layout file",
     "layout_system_loaded": "System layout loaded. Click Save to apply to the device.",
     "layout_system_select_file": "Select a layout file first",
-    "layout_applied": "Layout applied to the device",
-    "layout_apply_failed": "Failed to apply layout: ",
     "no_changes": "No changes to save",
     "saved_restarting": "Saved — device restarting…",
     "save_failed": "Save failed",
@@ -661,8 +652,7 @@
     "upload_failed": "Upload failed",
     "device_restarting_short": "Device restarting…",
     "changes_discarded": "Changes discarded",
-    "wifi_not_connected": "Wi-Fi is not connected.",
-    "font_applied": "Font applied."
+    "wifi_not_connected": "Wi-Fi is not connected."
   },
   "system": {
     "maintenance_title": "Maintenance",

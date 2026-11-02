@@ -83,11 +83,7 @@ async function loadSettings() {
   } else {
     setVal('static_ip', ''); setVal('static_gw', ''); setVal('static_nm', ''); setVal('static_dns1', ''); setVal('static_dns2', '');
   }
-  if (typeof populateSettingsLayoutSelect === 'function') await populateSettingsLayoutSelect();
 }
-
-const settingsLayoutLoadBtn = el('settingsLayoutLoadBtn');
-if (settingsLayoutLoadBtn) settingsLayoutLoadBtn.addEventListener('click', () => applySettingsLayoutToDevice());
 
 el('hostname').addEventListener('input', () => { if (el('hostname').value.trim()) { el('hostname').removeAttribute('aria-invalid'); el('hostname-err').classList.remove('show'); } });
 
@@ -214,5 +210,4 @@ function collectAdvancedPayload() {
 sectionLoaders.settings = async function () {
   await loadSettings();
   await loadAdvanced();
-  if (typeof initFontsShortcut === 'function') initFontsShortcut();
 };

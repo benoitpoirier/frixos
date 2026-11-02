@@ -557,32 +557,6 @@ function screenFileUrl(name) {
     return '/' + name.split('/').map(part => encodeURIComponent(part)).join('/');
 }
 
-// Fill a <select> with "Current" (value '') followed by every .layout file on
-// the device. Returns the list of file names. Shared by the layout editor and
-// the Settings > Display dropdown.
-function fillLayoutSelect(selectId) {
-    const select = el(selectId);
-    if (!select) return [];
-    const previous = select.value;
-    const names = getScreenLayoutFileNames();
-
-    select.innerHTML = '';
-    const current = document.createElement('option');
-    current.value = '';
-    current.textContent = getScreenTranslation('common.current', 'Current');
-    select.appendChild(current);
-
-    names.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = screenLayoutDisplayName(name);
-        select.appendChild(option);
-    });
-
-    select.value = names.includes(previous) ? previous : '';
-    return names;
-}
-
 async function refreshScreenLayoutFiles() {
     // The Presets gallery (renderScreenPresets) is now the only layout picker;
     // this just makes sure the SPIFFS file list is fresh before it renders.
@@ -591,7 +565,7 @@ async function refreshScreenLayoutFiles() {
 
 /* ---------- preset gallery ----------
    One card per .layout file on the device. Clicking a card loads that layout
-   into the editor (same path as the Load button); the user then presses Apply. */
+   into the editor; the user then presses Apply. */
 async function renderScreenPresets(selectedName) {
     const grid = el('screenPresets');
     if (!grid) return;
@@ -624,67 +598,6 @@ async function renderScreenPresets(selectedName) {
         card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
         grid.appendChild(card);
     });
-}
-
-// Settings > Display "Layout" dropdown: same file list, but selecting a file and
-// pressing Load applies it straight to the device (there is no editor there).
-async function populateSettingsLayoutSelect() {
-    await ensureScreenSpiffsFiles(true);
-    const names = fillLayoutSelect('settingsLayoutSelect');
-    const loadBtn = el('settingsLayoutLoadBtn');
-    if (loadBtn) loadBtn.disabled = names.length === 0;
-}
-
-async function applySettingsLayoutToDevice() {
-    const select = el('settingsLayoutSelect');
-    const btn = el('settingsLayoutLoadBtn');
-    const filename = select && select.value;
-    if (!filename) return; // "Current" selected -> nothing to load
-
-    try {
-        toggleLoading(btn, true);
-        showStatus(getMessage('saving_settings'), 'info');
-        const response = await fetch(screenFileUrl(filename));
-        if (!response.ok) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
-        const data = await response.json();
-        if (!data || !data.profiles) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
-
-        const layout = prepareScreenLayout(data);
-        layout.version = SCREEN_LAYOUT_VERSION;
-        ensureScreenLayoutMeta(layout);
-        ensureScreenProfileShape(layout.profiles.day);
-        ensureScreenProfileShape(layout.profiles.night);
-
-        const body = encodeScreenLayoutBinary(layout);
-        if (body.byteLength !== SCREEN_BIN_FULL_WIRE_SIZE) {
-            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_FULL_WIRE_SIZE}`);
-        }
-        const post = await fetch('/api/screen', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/octet-stream' },
-            body
-        });
-        const pdata = await post.json().catch(() => ({}));
-        if (post.ok && pdata && pdata.status === 'ok') {
-            // Keep the editor and cached settings in sync with what we pushed.
-            window.screenLayout = layout;
-            if (window.settings) {
-                window.settings.p04 = layout.day_font;
-                window.settings.p05 = layout.night_font;
-                window.settings.p10 = layout.day_color_filter;
-                window.settings.p11 = layout.night_color_filter;
-            }
-            showStatus(getMessage('layout_applied'), 'success');
-        } else {
-            const detail = pdata && pdata.error ? pdata.error : 'Unknown error';
-            showStatus(getMessage('layout_apply_failed') + detail, 'error');
-        }
-    } catch (error) {
-        console.error('Error applying layout:', error);
-        showStatus(getMessage('layout_apply_failed') + (error.message || ''), 'error');
-    } finally {
-        toggleLoading(btn, false);
-    }
 }
 
 function hasSpiffsFile(name) {
@@ -3843,88 +3756,6 @@ async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
     container.appendChild(wrap);
 }
 
-/* ---------- Fonts shortcut (Device > Display) ----------
-   A beginner-friendly control that changes only the clock font for the day
-   and/or night layout: it loads the current screen layout, sets day_font /
-   night_font, and saves it to the device (same effect as picking a font in
-   the Layout editor and pressing Apply) - without opening the editor.
-   `mode` is 'day' or 'night'; p04/p05 are the mirrored settings for each. */
-async function applyFontShortcut(mode, font, box, grid) {
-    if (!window.screenLayout || !window.screenLayout.profiles) {
-        await fetchScreenLayout(); // populate window.screenLayout from the device
-    }
-    if (!window.screenLayout) {
-        toast(getMessage('error_saving_settings'), 'err');
-        return;
-    }
-    const fontKey = mode === 'day' ? 'day_font' : 'night_font';
-    window.screenLayout[fontKey] = font;
-    window.screenLayout.version = SCREEN_LAYOUT_VERSION;
-    ensureScreenLayoutMeta(window.screenLayout);
-    ensureScreenProfileShape(window.screenLayout.profiles.day);
-    ensureScreenProfileShape(window.screenLayout.profiles.night);
-    grid.querySelectorAll('.screen-font-sample-box').forEach(b => b.classList.toggle('selected', b === box));
-    try {
-        const body = encodeScreenLayoutBinary(window.screenLayout);
-        const resp = await fetch('/api/screen', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/octet-stream' },
-            body
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (resp.ok && data && data.status === 'ok') {
-            if (window.settings) window.settings[mode === 'day' ? 'p04' : 'p05'] = font; // keep mirror in sync
-            toast(getMessage('font_applied'), 'ok');
-        } else {
-            toast(getMessage('error_saving_settings'), 'err');
-        }
-    } catch (e) {
-        console.error('Font apply failed:', e);
-        toast(getMessage('error_saving_unknown'), 'err');
-    }
-}
-
-function buildFontSampleGrid(mode, current) {
-    const grid = document.createElement('div');
-    grid.className = 'screen-font-samples-grid';
-    SCREEN_TIME_FONTS.forEach(font => {
-        const box = document.createElement('button');
-        box.type = 'button';
-        box.className = 'screen-font-sample-box' + (font === current ? ' selected' : '');
-        const name = document.createElement('div');
-        name.className = 'screen-font-sample-name';
-        name.textContent = font.charAt(0).toUpperCase() + font.slice(1);
-        box.appendChild(name);
-        box.appendChild(createFontSamplePreview(font));
-        box.addEventListener('click', () => applyFontShortcut(mode, font, box, grid));
-        grid.appendChild(box);
-    });
-    return grid;
-}
-
-async function renderFontsShortcut() {
-    const dayHost = el('dayFontSamples');
-    const nightHost = el('nightFontSamples');
-    if (!dayHost || !nightHost || dayHost.dataset.rendered) return;
-    dayHost.dataset.rendered = '1';
-    await ensureScreenSpiffsFiles();
-    if (!window.screenLayout || !window.screenLayout.profiles) {
-        await fetchScreenLayout();
-    }
-    dayHost.innerHTML = '';
-    dayHost.appendChild(buildFontSampleGrid('day', (window.screenLayout && window.screenLayout.day_font) || 'bold'));
-    nightHost.innerHTML = '';
-    nightHost.appendChild(buildFontSampleGrid('night', (window.screenLayout && window.screenLayout.night_font) || 'bold'));
-}
-
-function initFontsShortcut() {
-    const box = el('fontsBox');
-    if (!box || box.dataset.wired) return;
-    box.dataset.wired = '1';
-    // Render the samples lazily the first time the section is expanded.
-    box.addEventListener('toggle', () => { if (box.open) renderFontsShortcut(); });
-}
-
 function appendScreenTokenButtons(container, textarea, extraCodes) {
     const tokenWrap = document.createElement('div');
     tokenWrap.className = 'message-tokens screen-message-tokens';
@@ -4623,4 +4454,3 @@ sectionLoaders.layout = function () {
     fetchScreenLayout();
     renderScreenPresets();
 };
-

@@ -15,11 +15,9 @@
     "save_settings": "Zapisz ustawienia",
     "cancel": "Anuluj",
     "change_language": "Zmień język",
-    "current": "Bieżący",
     "file": "Plik",
     "hide_password": "Ukryj hasło",
     "insert": "Wstaw",
-    "load": "Wczytaj",
     "none": "Brak",
     "offline": "Offline",
     "online": "Online",
@@ -253,12 +251,6 @@
       "blue": "Niebieski",
       "bw": "Czarno-biały"
     },
-    "fonts": {
-      "title": "Czcionki",
-      "desc": "Wybierz czcionkę zegara dla dnia i nocy. Zaktualizuje to układ i zastosuje go od razu.",
-      "day": "Dzień",
-      "night": "Noc"
-    },
     "location": {
       "title": "Lokalizacja",
       "latitude": "Szerokość geograficzna",
@@ -335,6 +327,7 @@
       "dim_end": "Koniec dnia",
       "led_day": "Jasność (Dzień)",
       "led_night": "Jasność (Noc)",
+      "led_settings": "Ustawienia LED",
       "pwm_frequency": "Częstotliwość PWM",
       "max_power": "Maksymalna moc"
     },
@@ -604,8 +597,6 @@
     "file_renamed": "Zmieniono nazwę pliku",
     "files_deleted": "Usunięto {n} plik(ów)",
     "files_refreshed": "Odświeżono pliki",
-    "layout_applied": "Układ zastosowany na urządzeniu",
-    "layout_apply_failed": "Nie udało się zastosować układu: ",
     "no_changes": "Brak zmian do zapisania",
     "rename_failed": "Zmiana nazwy nie powiodła się",
     "rename_prompt": "Zmień nazwę \"{name}\" na:",
@@ -615,8 +606,7 @@
     "logs_refreshed": "Odświeżono logi",
     "upload_failed": "Przesyłanie nie powiodło się",
     "changes_discarded": "Zmiany odrzucone",
-    "wifi_not_connected": "Wi-Fi nie jest połączone.",
-    "font_applied": "Zastosowano czcionkę."
+    "wifi_not_connected": "Wi-Fi nie jest połączone."
   },
   "files": {
     "delete_selected": "Usuń zaznaczone",

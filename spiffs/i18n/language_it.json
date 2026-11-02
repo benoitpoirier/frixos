@@ -15,11 +15,9 @@
     "save_settings": "Salva impostazioni",
     "cancel": "Annulla",
     "change_language": "Cambia lingua",
-    "current": "Attuale",
     "file": "File",
     "hide_password": "Nascondi password",
     "insert": "Inserisci",
-    "load": "Carica",
     "none": "Nessuno",
     "offline": "Offline",
     "online": "Online",
@@ -253,12 +251,6 @@
       "blue": "Blu",
       "bw": "Bianco e nero"
     },
-    "fonts": {
-      "title": "Caratteri",
-      "desc": "Scegli il carattere dell’orologio per giorno e notte. Questo aggiorna il layout e lo applica subito.",
-      "day": "Giorno",
-      "night": "Notte"
-    },
     "location": {
       "title": "Posizione",
       "latitude": "Latitudine",
@@ -335,6 +327,7 @@
       "dim_end": "Fine del giorno",
       "led_day": "Luminosità (Giorno)",
       "led_night": "Luminosità (Notte)",
+      "led_settings": "Impostazioni LED",
       "pwm_frequency": "Frequenza PWM",
       "max_power": "Potenza massima"
     },
@@ -604,8 +597,6 @@
     "file_renamed": "File rinominato",
     "files_deleted": "Eliminato/i {n} file",
     "files_refreshed": "File aggiornati",
-    "layout_applied": "Layout applicato al dispositivo",
-    "layout_apply_failed": "Impossibile applicare il layout: ",
     "no_changes": "Nessuna modifica da salvare",
     "rename_failed": "Rinomina fallita",
     "rename_prompt": "Rinomina \"{name}\" in:",
@@ -615,8 +606,7 @@
     "logs_refreshed": "Log aggiornati",
     "upload_failed": "Caricamento fallito",
     "changes_discarded": "Modifiche scartate",
-    "wifi_not_connected": "Il Wi-Fi non è connesso.",
-    "font_applied": "Carattere applicato."
+    "wifi_not_connected": "Il Wi-Fi non è connesso."
   },
   "files": {
     "delete_selected": "Elimina selezionati",

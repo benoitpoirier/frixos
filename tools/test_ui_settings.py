@@ -527,13 +527,24 @@ def check_firmware(failures: list[str]) -> None:
         dim_time_markup = slice_between(
             index_text,
             '<div id="dimTime"',
-            '\n      </div>\n\n      <div class="grid2">\n        <div class="field"><label data-i18n="advanced.brightness.pwm_frequency"',
+            '\n      </div>\n\n      <div class="subtitle" data-i18n="advanced.brightness.led_settings">',
         )
     except RuntimeError as exc:
         fail("time dimming panel could not be located: %s" % exc, failures)
     else:
         if 'id="brightness_LED0"' not in dim_time_markup:
             fail("projection brightness sliders are not inside time dimming", failures)
+    try:
+        led_settings_markup = slice_between(
+            index_text,
+            '<div class="subtitle" data-i18n="advanced.brightness.led_settings">',
+            '\n    </div>\n\n    <div class="panel collapsible collapsed">',
+        )
+    except RuntimeError as exc:
+        fail("LED settings section could not be located: %s" % exc, failures)
+    else:
+        if 'id="pwm_frequency"' not in led_settings_markup or 'id="max_power"' not in led_settings_markup:
+            fail("LED settings section is missing PWM frequency or max power", failures)
     status_text = slice_between(text, "esp_err_t status_api_handler", "#define FILE_PATH")
     if '"luxhist"' not in status_text or "cJSON_CreateRaw(history_json)" not in status_text:
         fail("status API does not expose optional raw hourly history JSON", failures)

@@ -84,8 +84,6 @@ const translations = {
       layout_read_invalid: 'Invalid layout file',
       layout_system_loaded: 'System layout loaded. Click Apply to apply to the device.',
       layout_system_select_file: 'Select a layout file first',
-      layout_applied: 'Layout applied to the device',
-      layout_apply_failed: 'Failed to apply layout: ',
       sending_reset: 'Sending reset command…',
       device_restarting: 'Device is restarting. This page will refresh in ',
       device_restarting_seconds: ' seconds.',

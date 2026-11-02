@@ -144,11 +144,6 @@ function refreshDynamicI18n() {
     const e = el('heroOnline');
     if (e) e.textContent = window._heroOnline ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
   }
-  // Settings > Display layout dropdown holds a JS-built "Current" option;
-  // re-fill so it re-localizes. (The Layout tab uses the Presets gallery.)
-  if (typeof fillLayoutSelect === 'function' && el('settingsLayoutSelect')) {
-    fillLayoutSelect('settingsLayoutSelect');
-  }
   if (typeof refreshScreenshotI18n === 'function') refreshScreenshotI18n();
   if (window.BrightnessCurve) window.BrightnessCurve.refreshI18n();
 }

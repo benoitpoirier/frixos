@@ -15,11 +15,9 @@
     "save_settings": "Gem indstillinger",
     "cancel": "Annuller",
     "change_language": "Skift sprog",
-    "current": "Aktuel",
     "file": "Fil",
     "hide_password": "Skjul adgangskode",
     "insert": "Indsæt",
-    "load": "Indlæs",
     "none": "Ingen",
     "offline": "Offline",
     "online": "Online",
@@ -253,12 +251,6 @@
       "blue": "Blå",
       "bw": "Sort-hvid"
     },
-    "fonts": {
-      "title": "Skrifttyper",
-      "desc": "Vælg urets skrifttype for dag og nat. Dette opdaterer layoutet og anvender det med det samme.",
-      "day": "Dag",
-      "night": "Nat"
-    },
     "location": {
       "title": "Placering",
       "latitude": "Breddegrad",
@@ -335,6 +327,7 @@
       "dim_end": "Dagen slutter",
       "led_day": "Lysstyrke (dag)",
       "led_night": "Lysstyrke (nat)",
+      "led_settings": "LED-indstillinger",
       "pwm_frequency": "PWM-frekvens",
       "max_power": "Maksimal effekt"
     },
@@ -604,8 +597,6 @@
     "file_renamed": "Fil omdøbt",
     "files_deleted": "Slettede {n} fil(er)",
     "files_refreshed": "Filer opdateret",
-    "layout_applied": "Layout anvendt på enheden",
-    "layout_apply_failed": "Kunne ikke anvende layout: ",
     "no_changes": "Ingen ændringer at gemme",
     "rename_failed": "Omdøbning mislykkedes",
     "rename_prompt": "Omdøb \"{name}\" til:",
@@ -615,8 +606,7 @@
     "logs_refreshed": "Logfiler opdateret",
     "upload_failed": "Upload mislykkedes",
     "changes_discarded": "Ændringer kasseret",
-    "wifi_not_connected": "Wi-Fi er ikke tilsluttet.",
-    "font_applied": "Skrifttype anvendt."
+    "wifi_not_connected": "Wi-Fi er ikke tilsluttet."
   },
   "files": {
     "delete_selected": "Slet valgte",
