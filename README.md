@@ -16,7 +16,19 @@
 >   - on-demand refresh, optional capture when the page opens and auto-refresh (10 s, 30 s or 1 min)
 >   - download of the capture as a PNG
 >   - a subtle circle marks the area actually visible on the wall, the corners outside it are dimmed
+>
+>   <p align="center">
+>     <a href="artwork/DisplayCapture.png">
+>       <img src="artwork/DisplayCapture.png" alt="Live screen capture in the Device tab" width="820">
+>     </a>
+>   </p>
 > - **Adaptive brightness and simplified dimming modes** in Device → Display: Full keeps brightness at 100%, Based on Brightness follows the ambient-light sensor and adaptive curve (four draggable lux/brightness points, a day/night threshold and 24-hour lux history), and Based on Time uses the Day/Night sliders during the configured day window. Controls are in the main Display panel without a separate Advanced disclosure; projection sliders appear only for time-based dimming.
+>
+>   <p align="center">
+>     <a href="artwork/AdaptativeLuminosity.png">
+>       <img src="artwork/AdaptativeLuminosity.png" alt="Adaptive brightness curve and 24-hour ambient-light history" width="820">
+>     </a>
+>   </p>
 > - **Streamlined Device display settings**: font and layout selectors are centralized in the Layout tab instead of being duplicated in Device, and PWM frequency and maximum power are grouped under an LED settings heading.
 > - **Firmware OTA disabled by default**: automatic checks, firmware uploads, and reinstalls are blocked with `DISABLE_AUTO_OTA=1`; SPIFFS file uploads and boot validation for rollback safety remain available. Set the flag to `0` only for an OTA-enabled build.
 
